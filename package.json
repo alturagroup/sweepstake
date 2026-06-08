@@ -4,12 +4,15 @@
   "description": "Internal World Cup Sweepstake tool with a pure domain core, service layer, and HTTP API.",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "license": "MIT",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4"
+  },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "fast-check": "^3.23.2",

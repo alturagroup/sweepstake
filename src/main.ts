@@ -25,7 +25,11 @@ import { fileURLToPath } from "node:url";
 
 import { createApp } from "./api/index.js";
 import type { Rng } from "./domain/assignment.js";
-import { JsonFileSweepstakeRepository } from "./persistence/index.js";
+import {
+  JsonFileSweepstakeRepository,
+  type SweepstakeRepository,
+} from "./persistence/index.js";
+import { NeonSweepstakeRepository } from "./persistence/neon.js";
 import { SweepstakeService } from "./service/index.js";
 
 /** Default path for the JSON state document when SWEEPSTAKE_DATA_FILE is unset. */
@@ -67,6 +71,12 @@ export interface ServerConfig {
   port: number;
   /** Network interface to bind. */
   host: string;
+  /**
+   * Neon Postgres connection string. When present, the app persists to Neon
+   * instead of the JSON file. Sourced from `DATABASE_URL`; it is a secret and
+   * is never logged.
+   */
+  databaseUrl: string | null;
 }
 
 /**
@@ -90,7 +100,12 @@ export function resolveConfig(
   const host =
     env.HOST && env.HOST.trim().length > 0 ? env.HOST : DEFAULT_HOST;
 
-  return { dataFile, port, host };
+  const databaseUrl =
+    env.DATABASE_URL && env.DATABASE_URL.trim().length > 0
+      ? env.DATABASE_URL
+      : null;
+
+  return { dataFile, port, host, databaseUrl };
 }
 
 /**
@@ -106,30 +121,68 @@ export function buildServer(
   rng: Rng = createSeededRng(),
 ): Server {
   const repository = new JsonFileSweepstakeRepository(dataFile);
+  return buildServerFromRepository(repository, rng);
+}
+
+/**
+ * Compose the full application over an explicit repository and RNG. This is the
+ * storage-agnostic seam: any {@link SweepstakeRepository} (JSON file, Neon,
+ * etc.) can be wired in without the API or service layers changing.
+ */
+export function buildServerFromRepository(
+  repository: SweepstakeRepository,
+  rng: Rng = createSeededRng(),
+): Server {
   const service = new SweepstakeService(repository, rng);
   return createApp(service);
 }
 
 /**
- * Compose the application from environment-derived configuration, using the
- * seeded production RNG. Returns the resolved config alongside the
- * not-yet-listening server so a caller (or the direct-run guard below) can log
- * and bind it.
+ * Select the persistence repository from configuration: a Neon-backed store
+ * when `DATABASE_URL` is set (its schema is ensured up front), otherwise the
+ * JSON-file store. Returns the repository plus a label for startup logging.
  */
-export function createServerFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): { server: Server; config: ServerConfig } {
-  const config = resolveConfig(env);
-  const server = buildServer(config.dataFile, createSeededRng());
-  return { server, config };
+export async function createRepositoryFromConfig(
+  config: ServerConfig,
+): Promise<{ repository: SweepstakeRepository; description: string }> {
+  if (config.databaseUrl !== null) {
+    const repository = await NeonSweepstakeRepository.create(
+      config.databaseUrl,
+    );
+    return { repository, description: "Neon Postgres" };
+  }
+  return {
+    repository: new JsonFileSweepstakeRepository(config.dataFile),
+    description: `JSON file: ${config.dataFile}`,
+  };
 }
 
 /**
- * Build the server from the environment and bind it, logging the data file and
- * the bound address once listening.
+ * Compose the application from environment-derived configuration, using the
+ * seeded production RNG and the configured persistence backend (Neon when
+ * `DATABASE_URL` is set, otherwise the JSON file). Returns the resolved config
+ * and a storage description alongside the not-yet-listening server so a caller
+ * (or the direct-run guard below) can log and bind it.
+ *
+ * Async because selecting the Neon backend ensures its schema up front.
  */
-export function startFromEnv(env: NodeJS.ProcessEnv = process.env): Server {
-  const { server, config } = createServerFromEnv(env);
+export async function createServerFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<{ server: Server; config: ServerConfig; storage: string }> {
+  const config = resolveConfig(env);
+  const { repository, description } = await createRepositoryFromConfig(config);
+  const server = buildServerFromRepository(repository, createSeededRng());
+  return { server, config, storage: description };
+}
+
+/**
+ * Build the server from the environment and bind it, logging the storage
+ * backend and the bound address once listening.
+ */
+export async function startFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<Server> {
+  const { server, config, storage } = await createServerFromEnv(env);
   server.listen(config.port, config.host, () => {
     const address = server.address();
     const bound =
@@ -137,7 +190,7 @@ export function startFromEnv(env: NodeJS.ProcessEnv = process.env): Server {
         ? `${address.address}:${address.port}`
         : String(address);
     console.log(
-      `Sweepstake server listening on ${bound} (data file: ${config.dataFile})`,
+      `Sweepstake server listening on ${bound} (storage: ${storage})`,
     );
   });
   return server;
@@ -162,5 +215,8 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  startFromEnv();
+  startFromEnv().catch((error: unknown) => {
+    console.error("Failed to start the sweepstake server:", error);
+    process.exitCode = 1;
+  });
 }

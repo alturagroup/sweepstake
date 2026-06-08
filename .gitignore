@@ -6,3 +6,8 @@ coverage/
 
 # Runtime state document written by the server bootstrap
 data/
+
+# Environment files (contain DATABASE_URL and other secrets)
+.env
+.env.*
+!.env.example

@@ -1,0 +1,8 @@
+{
+  // Build configuration: compiles only production source into dist/.
+  // Test files (*.test.ts, tests/**) are intentionally excluded — they are run
+  // by vitest and must never be emitted into the published build output.
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "tests"]
+}
