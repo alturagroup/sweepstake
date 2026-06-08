@@ -210,15 +210,15 @@ function ok(): { ok: true } {
 }
 
 /**
- * Create the HTTP server for the sweepstake API, wired over the given service.
- *
- * The returned server is not yet listening; the caller decides when/where to
- * bind (production bootstrap binds a port; tests can drive it directly or via
- * an ephemeral port). All routing, body parsing, and error mapping is handled
- * internally.
+ * Build the request listener that powers the API: routing, body parsing, and
+ * error mapping over the given service. Shared by both the persistent
+ * {@link createApp} server and serverless function adapters (e.g. Vercel),
+ * since both receive Node `IncomingMessage`/`ServerResponse` objects.
  */
-export function createApp(service: SweepstakeService): Server {
-  return createServer((req, res) => {
+export function createRequestListener(
+  service: SweepstakeService,
+): (req: IncomingMessage, res: ServerResponse) => void {
+  return (req, res) => {
     handleRequest(service, req, res).catch((error: unknown) => {
       // Distinguish malformed JSON bodies (client error) from unexpected
       // internal failures, without leaking internal detail.
@@ -234,7 +234,19 @@ export function createApp(service: SweepstakeService): Server {
         message: "An unexpected error occurred.",
       });
     });
-  });
+  };
+}
+
+/**
+ * Create the HTTP server for the sweepstake API, wired over the given service.
+ *
+ * The returned server is not yet listening; the caller decides when/where to
+ * bind (production bootstrap binds a port; tests can drive it directly or via
+ * an ephemeral port). All routing, body parsing, and error mapping is handled
+ * internally.
+ */
+export function createApp(service: SweepstakeService): Server {
+  return createServer(createRequestListener(service));
 }
 
 /** Match a pathname like `/participants/{id}` and return the decoded id, or null. */
