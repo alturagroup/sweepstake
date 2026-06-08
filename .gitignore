@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+coverage/
+.DS_Store
+
+# Runtime state document written by the server bootstrap
+data/

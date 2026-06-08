@@ -1,0 +1,19 @@
+{
+  "name": "worldcup-sweepstake",
+  "version": "0.1.0",
+  "description": "Internal World Cup Sweepstake tool with a pure domain core, service layer, and HTTP API.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "fast-check": "^3.23.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
