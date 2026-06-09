@@ -202,9 +202,14 @@ async function route(service: LeagueService, req: IncomingMessage, res: ServerRe
       return sendJson(res, 200, { ok: true }, { "set-cookie": cookie });
     }
 
-    // Public (password cookie or token): the league standings view.
+    // Public (password cookie, token, or link-only league): the standings view.
     if (action === "view" && method === "GET") {
-      if (!viewerOk(req, slug)) return sendJson(res, 401, { code: "LEAGUE_LOCKED", message: "Enter the league password." });
+      const needsPw = await service.requiresPassword(slug);
+      if (typeof needsPw !== "boolean") return notFoundLeague(res);
+      // Link-only leagues (no password) are viewable by anyone with the URL.
+      if (needsPw && !viewerOk(req, slug)) {
+        return sendJson(res, 401, { code: "LEAGUE_LOCKED", message: "Enter the league password." });
+      }
       const view = await service.getView(slug);
       if (isNotFound(view)) return notFoundLeague(res);
       return sendJson(res, 200, view);

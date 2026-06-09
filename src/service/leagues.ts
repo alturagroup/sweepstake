@@ -61,8 +61,17 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 /** Normalize a requested slug to lowercase URL-safe form, or null if invalid. */
 function normalizeSlug(raw: string): string | null {
-  const slug = raw.trim().toLowerCase().replace(/\s+/g, "-");
-  return /^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$/.test(slug) ? slug : null;
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s.length >= 1 && s.length <= 40 ? s : null;
+}
+
+/** Generate a short, unguessable URL token (random hex). */
+function urlToken(): string {
+  return randomBytes(6).toString("hex"); // 12 hex chars
 }
 
 export class LeagueService {
@@ -163,15 +172,21 @@ export class LeagueService {
     requestedSlug: string,
     viewPassword: string,
   ): Promise<Result<League, SlugError>> {
-    const slug = normalizeSlug(requestedSlug);
-    if (slug === null) return { ok: false, error: { code: "INVALID_SLUG" } };
-    const existing = await this.repo.getLeagueBySlug(slug);
-    if (existing) return { ok: false, error: { code: "DUPLICATE_SLUG" } };
+    const base = normalizeSlug(requestedSlug) || normalizeSlug(name) || "league";
+    if (base === null) return { ok: false, error: { code: "INVALID_SLUG" } };
+    // Append an unguessable random token so the URL itself acts as the secret.
+    // Retry on the (astronomically unlikely) event of a collision.
+    let slug = `${base}-${urlToken()}`;
+    for (let i = 0; i < 5 && (await this.repo.getLeagueBySlug(slug)); i++) {
+      slug = `${base}-${urlToken()}`;
+    }
+    // Password is optional: empty means the unguessable link alone grants access.
+    const hasPassword = viewPassword.trim().length > 0;
     const league: League = {
       id: randomUUID(),
       slug,
-      name: name.trim() || slug,
-      viewPasswordHash: hashPassword(viewPassword),
+      name: name.trim() || base,
+      viewPasswordHash: hasPassword ? hashPassword(viewPassword) : "",
       participants: [],
       assignments: [],
       leagueFinalized: false,
@@ -257,11 +272,19 @@ export class LeagueService {
     });
   }
 
-  /** Verify a viewer's password for a league. */
+  /** Verify a viewer's password for a league. A league with no password set is always viewable. */
   async checkPassword(slug: string, password: string): Promise<boolean | LeagueNotFound> {
     const l = await this.repo.getLeagueBySlug(slug);
     if (!l) return { code: "LEAGUE_NOT_FOUND" };
+    if (l.viewPasswordHash === "") return true; // no password: link is the secret
     return verifyPassword(password, l.viewPasswordHash);
+  }
+
+  /** Whether a league requires a password to view (false if link-only). */
+  async requiresPassword(slug: string): Promise<boolean | LeagueNotFound> {
+    const l = await this.repo.getLeagueBySlug(slug);
+    if (!l) return { code: "LEAGUE_NOT_FOUND" };
+    return l.viewPasswordHash !== "";
   }
 }
 

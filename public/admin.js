@@ -164,9 +164,18 @@ async function refreshLeagues() {
     delBtn.className = "secondary";
     delBtn.onclick = () => { if (confirm(`Delete league "${lg.name}"? This cannot be undone.`)) run(() => api("DELETE", `/api/leagues/${encodeURIComponent(lg.slug)}`), "League deleted."); };
 
+    const copyBtn = document.createElement("button");
+    copyBtn.textContent = "Copy link";
+    copyBtn.className = "secondary";
+    copyBtn.onclick = async () => {
+      try { await navigator.clipboard.writeText(link); toast("Link copied.", "ok"); }
+      catch { toast("Copy failed — select the link manually.", "err"); }
+    };
+
     controls.appendChild(addBtn);
     controls.appendChild(drawBtn);
     controls.appendChild(finBtn);
+    controls.appendChild(copyBtn);
     controls.appendChild(delBtn);
     li.appendChild(info);
     li.appendChild(controls);
@@ -354,13 +363,12 @@ const createLeagueBtn = document.getElementById("create-league");
 if (createLeagueBtn) {
   createLeagueBtn.onclick = () => {
     const name = document.getElementById("league-name-in").value.trim();
-    const slug = document.getElementById("league-slug-in").value.trim();
     const password = document.getElementById("league-pass-in").value;
-    if (!name || !slug || !password) return toast("Name, slug and password are all required.", "err");
+    if (!name) return toast("Enter a league name.", "err");
     run(async () => {
-      await api("POST", "/api/leagues", { name, slug, password });
+      // Server derives an unguessable slug from the name + a random token.
+      await api("POST", "/api/leagues", { name, slug: name, password });
       document.getElementById("league-name-in").value = "";
-      document.getElementById("league-slug-in").value = "";
       document.getElementById("league-pass-in").value = "";
     }, "League created.");
   };

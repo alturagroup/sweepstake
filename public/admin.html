@@ -42,11 +42,10 @@
     <main class="admin-wrap">
       <fieldset>
         <legend>Sweepstake leagues</legend>
-        <p class="muted">Create a league for a group (e.g. "work", "friends"). Each gets its own link and view password. Results and teams are shared across all leagues; run each league's draw separately.</p>
+        <p class="muted">Create a league for a group (e.g. "Work", "Friends"). Each gets its own <strong>unguessable share link</strong> — only people you send it to can find it. Password is optional. Results and teams are shared across all leagues; run each league's draw separately.</p>
         <div class="row">
           <div><label for="league-name-in">Name</label><input id="league-name-in" placeholder="Work" /></div>
-          <div><label for="league-slug-in">Link slug</label><input id="league-slug-in" placeholder="work" /></div>
-          <div><label for="league-pass-in">View password</label><input id="league-pass-in" placeholder="shared password" /></div>
+          <div><label for="league-pass-in">View password (optional)</label><input id="league-pass-in" placeholder="leave blank for link-only" /></div>
           <button id="create-league" type="button">Create</button>
         </div>
         <ul id="league-list" class="pill-list"></ul>
