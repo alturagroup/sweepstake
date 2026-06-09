@@ -86,16 +86,43 @@ export class LeagueService {
   /**
    * Compose a full SweepstakeState from the shared tournament and one league,
    * so a pure domain function can operate on it unchanged.
+   *
+   * When the league restricts its nation pool (`includedNationIds`), only those
+   * nations are exposed. This scopes the random draw to the chosen subset (e.g.
+   * the top 10 teams) while scoring still works because it sums over each
+   * participant's assigned nations using the shared match set.
    */
   private compose(t: TournamentState, l: League): SweepstakeState {
+    const nations =
+      l.includedNationIds === null
+        ? t.nations
+        : t.nations.filter((n) => l.includedNationIds?.includes(n.id));
     return {
       participants: l.participants,
-      nations: t.nations,
+      nations,
       assignments: l.assignments,
       matches: t.matches,
       championNationId: t.championNationId,
       leagueFinalized: l.leagueFinalized,
     };
+  }
+
+  /**
+   * Set (or clear) the nations a league draws from. Pass `null` to allow all
+   * tournament nations. Rejected once the league already has assignments, since
+   * changing the pool after the draw would invalidate it.
+   */
+  async setIncludedNations(
+    slug: string,
+    nationIds: Id[] | null,
+  ): Promise<Result<unknown, DomainError> | LeagueNotFound> {
+    return this.withLeague(slug, async (_t, l) => {
+      if (l.assignments.length > 0) {
+        return { ok: false as const, error: { code: "ASSIGNMENTS_EXIST" } as DomainError };
+      }
+      await this.repo.saveLeague({ ...l, includedNationIds: nationIds });
+      return { ok: true as const, value: undefined };
+    });
   }
 
   // --- Shared tournament management (global admin) ------------------------
@@ -190,18 +217,20 @@ export class LeagueService {
       participants: [],
       assignments: [],
       leagueFinalized: false,
+      includedNationIds: null,
     };
     await this.repo.insertLeague(league);
     return { ok: true, value: league };
   }
 
-  async listLeagues(): Promise<Array<{ slug: string; name: string; participantCount: number; assigned: boolean }>> {
+  async listLeagues(): Promise<Array<{ slug: string; name: string; participantCount: number; assigned: boolean; nationPool: number | null }>> {
     const leagues = await this.repo.listLeagues();
     return leagues.map((l) => ({
       slug: l.slug,
       name: l.name,
       participantCount: l.participants.length,
       assigned: l.assignments.length > 0,
+      nationPool: l.includedNationIds === null ? null : l.includedNationIds.length,
     }));
   }
 
@@ -286,6 +315,13 @@ export class LeagueService {
     if (!l) return { code: "LEAGUE_NOT_FOUND" };
     return l.viewPasswordHash !== "";
   }
+
+  /** Admin: a league's current settings (its nation pool), for the settings UI. */
+  async getSettings(slug: string): Promise<{ includedNationIds: Id[] | null; assigned: boolean } | LeagueNotFound> {
+    const l = await this.repo.getLeagueBySlug(slug);
+    if (!l) return { code: "LEAGUE_NOT_FOUND" };
+    return { includedNationIds: l.includedNationIds, assigned: l.assignments.length > 0 };
+  }
 }
 
 /** A minimal empty league used when composing tournament-only operations. */
@@ -298,6 +334,7 @@ function emptyLeagueShell(): League {
     participants: [],
     assignments: [],
     leagueFinalized: false,
+    includedNationIds: null,
   };
 }
 

@@ -37,6 +37,12 @@ export interface League {
   participants: Participant[];
   assignments: Assignment[];
   leagueFinalized: boolean;
+  /**
+   * Nation ids this league draws from. `null` means all tournament nations are
+   * eligible. A subset lets a league restrict the draw (e.g. only the top 10
+   * ranked teams for a 10-player league).
+   */
+  includedNationIds: Id[] | null;
 }
 
 /** A fresh, empty shared tournament. */
@@ -80,8 +86,13 @@ export class NeonLeagueRepository {
         view_password_hash TEXT NOT NULL,
         participants JSONB NOT NULL DEFAULT '[]'::jsonb,
         assignments JSONB NOT NULL DEFAULT '[]'::jsonb,
-        league_finalized BOOLEAN NOT NULL DEFAULT FALSE
+        league_finalized BOOLEAN NOT NULL DEFAULT FALSE,
+        included_nation_ids JSONB
       )
+    `;
+    // Add the column to pre-existing tables (no-op if already present).
+    await this.sql`
+      ALTER TABLE leagues ADD COLUMN IF NOT EXISTS included_nation_ids JSONB
     `;
   }
 
@@ -112,6 +123,7 @@ export class NeonLeagueRepository {
     participants: Participant[];
     assignments: Assignment[];
     league_finalized: boolean;
+    included_nation_ids: Id[] | null;
   }): League {
     return {
       id: row.id,
@@ -121,12 +133,13 @@ export class NeonLeagueRepository {
       participants: row.participants,
       assignments: row.assignments,
       leagueFinalized: row.league_finalized,
+      includedNationIds: row.included_nation_ids ?? null,
     };
   }
 
   async listLeagues(): Promise<League[]> {
     const rows = (await this.sql`
-      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized
+      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids
       FROM leagues ORDER BY name
     `) as Parameters<typeof NeonLeagueRepository.rowToLeague>[0][];
     return rows.map((r) => NeonLeagueRepository.rowToLeague(r));
@@ -134,7 +147,7 @@ export class NeonLeagueRepository {
 
   async getLeagueBySlug(slug: string): Promise<League | null> {
     const rows = (await this.sql`
-      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized
+      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids
       FROM leagues WHERE slug = ${slug}
     `) as Parameters<typeof NeonLeagueRepository.rowToLeague>[0][];
     const row = rows[0];
@@ -143,16 +156,17 @@ export class NeonLeagueRepository {
 
   async insertLeague(league: League): Promise<void> {
     await this.sql`
-      INSERT INTO leagues (id, slug, name, view_password_hash, participants, assignments, league_finalized)
+      INSERT INTO leagues (id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids)
       VALUES (
         ${league.id}, ${league.slug}, ${league.name}, ${league.viewPasswordHash},
         ${JSON.stringify(league.participants)}, ${JSON.stringify(league.assignments)},
-        ${league.leagueFinalized}
+        ${league.leagueFinalized},
+        ${league.includedNationIds === null ? null : JSON.stringify(league.includedNationIds)}
       )
     `;
   }
 
-  /** Persist the mutable per-league fields (participants/assignments/finalized). */
+  /** Persist the mutable per-league fields (participants/assignments/finalized/included nations). */
   async saveLeague(league: League): Promise<void> {
     await this.sql`
       UPDATE leagues SET
@@ -160,7 +174,8 @@ export class NeonLeagueRepository {
         view_password_hash = ${league.viewPasswordHash},
         participants = ${JSON.stringify(league.participants)},
         assignments = ${JSON.stringify(league.assignments)},
-        league_finalized = ${league.leagueFinalized}
+        league_finalized = ${league.leagueFinalized},
+        included_nation_ids = ${league.includedNationIds === null ? null : JSON.stringify(league.includedNationIds)}
       WHERE id = ${league.id}
     `;
   }

@@ -150,12 +150,22 @@ async function refreshLeagues() {
     const copyBtn = document.createElement("button");
     copyBtn.textContent = "Copy link"; copyBtn.className = "secondary";
     copyBtn.onclick = async () => { try { await navigator.clipboard.writeText(link); toast("Link copied.", "ok"); } catch { toast("Copy failed.", "err"); } };
+    const teamsBtn = document.createElement("button");
+    teamsBtn.textContent = "Teams"; teamsBtn.className = "secondary";
+    teamsBtn.onclick = () => toggleTeamPicker(lg, li);
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete"; delBtn.className = "secondary";
     delBtn.onclick = () => { if (confirm(`Delete league "${lg.name}"? This cannot be undone.`)) run(() => api("DELETE", `/api/leagues/${encodeURIComponent(lg.slug)}`), "League deleted."); };
 
-    controls.appendChild(addBtn); controls.appendChild(drawBtn); controls.appendChild(finBtn); controls.appendChild(copyBtn); controls.appendChild(delBtn);
+    controls.appendChild(addBtn); controls.appendChild(drawBtn); controls.appendChild(finBtn); controls.appendChild(teamsBtn); controls.appendChild(copyBtn); controls.appendChild(delBtn);
     li.appendChild(info); li.appendChild(controls);
+    if (lg.nationPool !== null) {
+      const poolNote = document.createElement("span");
+      poolNote.className = "muted";
+      poolNote.style.flex = "1 1 100%";
+      poolNote.textContent = `Draw pool: ${lg.nationPool} teams (restricted)`;
+      li.appendChild(poolNote);
+    }
     list.appendChild(li);
   }
 }
@@ -240,9 +250,9 @@ function addNation() {
   const input = document.getElementById("nation-name");
   const name = input.value.trim();
   if (!name) return toast("Enter a name.", "err");
-  run(async () => { await api("POST", "/api/tournament/nations", { name }); input.value = ""; }, "Nation added.");
+  run(async () => { await api("POST", "/api/tournament/nations", { name }); input.value = ""; allNationsCache = null; }, "Nation added.");
 }
-function removeNation(id) { run(() => api("DELETE", `/api/tournament/nations/${encodeURIComponent(id)}`), "Nation removed."); }
+function removeNation(id) { run(async () => { await api("DELETE", `/api/tournament/nations/${encodeURIComponent(id)}`); allNationsCache = null; }, "Nation removed."); }
 function matchBody() {
   return {
     nationAId: document.getElementById("match-a").value,
@@ -250,6 +260,93 @@ function matchBody() {
     goalsA: Number(document.getElementById("goals-a").value),
     goalsB: Number(document.getElementById("goals-b").value),
   };
+}
+
+// --- Per-league team picker ----------------------------------------------
+
+let allNationsCache = null;
+
+async function toggleTeamPicker(lg, li) {
+  // Toggle: if a picker is already open under this row, close it.
+  const existing = li.querySelector('[data-role="team-picker"]');
+  if (existing) { existing.remove(); return; }
+
+  if (allNationsCache === null) {
+    allNationsCache = await api("GET", "/api/tournament/nations");
+  }
+  const settings = await api("GET", `/api/leagues/${encodeURIComponent(lg.slug)}/settings`);
+  const included = settings.includedNationIds; // null = all
+  const isIncluded = (id) => included === null || included.includes(id);
+
+  const box = document.createElement("div");
+  box.dataset.role = "team-picker";
+  box.style.flex = "1 1 100%";
+  box.style.marginTop = "0.5rem";
+  box.style.padding = "0.5rem 0.75rem";
+  box.style.border = "1px solid var(--line)";
+  box.style.borderRadius = "8px";
+
+  if (settings.assigned) {
+    box.innerHTML = '<p class="muted">The draw has already run for this league. Teams are locked. Re-draw is allowed, but the team pool can only be changed before any draw.</p>';
+    li.appendChild(box);
+    return;
+  }
+
+  const header = document.createElement("p");
+  header.className = "muted";
+  header.innerHTML = `Select which teams are eligible for <strong>${escapeHtml(lg.name)}</strong>'s draw. Tip: for a 10-player league, include ~10 teams.`;
+  box.appendChild(header);
+
+  const tools = document.createElement("div");
+  tools.className = "row";
+  const allBtn = document.createElement("button"); allBtn.textContent = "All"; allBtn.className = "secondary";
+  const noneBtn = document.createElement("button"); noneBtn.textContent = "None"; noneBtn.className = "secondary";
+  const count = document.createElement("span"); count.className = "muted"; count.style.alignSelf = "center";
+  tools.appendChild(allBtn); tools.appendChild(noneBtn); tools.appendChild(count);
+  box.appendChild(tools);
+
+  const grid = document.createElement("div");
+  grid.style.display = "grid";
+  grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(11rem, 1fr))";
+  grid.style.gap = "0.25rem";
+  grid.style.margin = "0.5rem 0";
+
+  const sorted = [...allNationsCache].sort((a, b) => a.displayName.localeCompare(b.displayName));
+  for (const n of sorted) {
+    const lbl = document.createElement("label");
+    lbl.style.fontWeight = "400";
+    lbl.style.margin = "0";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = n.id; cb.checked = isIncluded(n.id);
+    cb.style.width = "auto"; cb.style.marginRight = "0.4rem";
+    cb.onchange = updateCount;
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(n.displayName));
+    grid.appendChild(lbl);
+  }
+  box.appendChild(grid);
+
+  function checks() { return [...grid.querySelectorAll("input[type=checkbox]")]; }
+  function updateCount() { count.textContent = `${checks().filter((c) => c.checked).length} selected`; }
+  allBtn.onclick = () => { checks().forEach((c) => (c.checked = true)); updateCount(); };
+  noneBtn.onclick = () => { checks().forEach((c) => (c.checked = false)); updateCount(); };
+  updateCount();
+
+  const saveRow = document.createElement("div");
+  saveRow.className = "row";
+  const save = document.createElement("button");
+  save.textContent = "Save team pool";
+  save.onclick = () => {
+    const selected = checks().filter((c) => c.checked).map((c) => c.value);
+    if (selected.length === 0) return toast("Select at least one team.", "err");
+    // If all teams are selected, store null (= no restriction).
+    const nationIds = selected.length === allNationsCache.length ? null : selected;
+    run(() => api("PUT", `/api/leagues/${encodeURIComponent(lg.slug)}/nations`, { nationIds }), "Team pool saved.");
+  };
+  saveRow.appendChild(save);
+  box.appendChild(saveRow);
+
+  li.appendChild(box);
 }
 
 async function refreshAll() {

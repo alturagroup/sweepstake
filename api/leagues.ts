@@ -233,6 +233,17 @@ async function route(service: LeagueService, req: IncomingMessage, res: ServerRe
     if (action === "finalize" && method === "POST") {
       return finishMaybe(res, await service.finalize(slug));
     }
+    if (action === "settings" && method === "GET") {
+      const s = await service.getSettings(slug);
+      if (isNotFound(s)) return notFoundLeague(res);
+      return sendJson(res, 200, s);
+    }
+    if (action === "nations" && method === "PUT") {
+      const b = await readBody(req);
+      // body.nationIds: array of ids, or null/absent to allow all nations.
+      const ids = Array.isArray(b.nationIds) ? b.nationIds.map((x) => String(x)) : null;
+      return finishMaybe(res, await service.setIncludedNations(slug, ids));
+    }
     return notFound(res, method, url.pathname);
   }
 
