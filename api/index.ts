@@ -11,6 +11,7 @@
 // validated at module load. The service is built once per cold start and
 // reused across invocations on the same warm instance.
 
+import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { createRequestListener } from "../src/api/index.js";
@@ -53,13 +54,81 @@ function getListener(): Promise<
 }
 
 /**
+ * Constant-time comparison of two strings. Avoids leaking, via response
+ * timing, how many leading characters of a guessed token were correct.
+ * Returns false for length mismatches (after a dummy compare to keep timing
+ * roughly uniform).
+ */
+function safeEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, "utf8");
+  const bBuf = Buffer.from(b, "utf8");
+  if (aBuf.length !== bBuf.length) {
+    // Compare against itself so the work done is independent of which input
+    // differed; still returns false on the length mismatch.
+    timingSafeEqual(aBuf, aBuf);
+    return false;
+  }
+  return timingSafeEqual(aBuf, bBuf);
+}
+
+/**
+ * Enforce bearer-token authentication.
+ *
+ * The expected token is read from the `API_TOKEN` environment variable. When
+ * `API_TOKEN` is unset the API is treated as misconfigured and every request is
+ * refused (fail closed) rather than silently running unprotected.
+ *
+ * Returns true when the request is authorized; otherwise writes the appropriate
+ * 401/503 response and returns false.
+ */
+function isAuthorized(req: IncomingMessage, res: ServerResponse): boolean {
+  const expected = process.env.API_TOKEN;
+  if (!expected || expected.trim().length === 0) {
+    res.writeHead(503, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        code: "AUTH_NOT_CONFIGURED",
+        message: "The API is not configured for access. Set API_TOKEN.",
+      }),
+    );
+    return false;
+  }
+
+  const header = req.headers.authorization ?? "";
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  const provided = match?.[1]?.trim();
+
+  if (provided === undefined || !safeEqual(provided, expected)) {
+    res.writeHead(401, {
+      "content-type": "application/json",
+      "www-authenticate": "Bearer",
+    });
+    res.end(
+      JSON.stringify({
+        code: "UNAUTHORIZED",
+        message: "A valid bearer token is required.",
+      }),
+    );
+    return false;
+  }
+  return true;
+}
+
+/**
  * Vercel Node serverless handler. `req`/`res` are Node
  * `IncomingMessage`/`ServerResponse`, which the shared listener already speaks.
+ *
+ * Every request must carry a valid `Authorization: Bearer <API_TOKEN>` header;
+ * unauthorized requests are rejected before the service is touched.
  */
 export default async function handler(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
+  if (!isAuthorized(req, res)) {
+    return;
+  }
+
   let listener: (req: IncomingMessage, res: ServerResponse) => void;
   try {
     listener = await getListener();
