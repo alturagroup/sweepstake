@@ -112,6 +112,120 @@ async function refreshAll() {
     refreshParticipants().catch((e) => toast(e.message, "err")),
     refreshNations().catch((e) => toast(e.message, "err")),
   ]);
+  await refreshFixtures().catch((e) => toast(e.message, "err"));
+}
+
+// --- Fixtures (group-stage schedule) -------------------------------------
+
+let scheduleCache = null;
+
+/** Build a lookup from a nation's display name to its id. */
+function nationIdMap(nations) {
+  const map = new Map();
+  for (const n of nations) map.set(n.displayName, n.id);
+  return map;
+}
+
+/** Unordered-pair key so a stored match matches a fixture regardless of order. */
+function pairKey(aId, bId) {
+  return [aId, bId].sort().join("|");
+}
+
+async function refreshFixtures() {
+  const container = document.getElementById("fixtures");
+  if (scheduleCache === null) {
+    const res = await fetch("/schedule.json", { headers: { accept: "application/json" } });
+    if (!res.ok) throw new Error("Could not load the fixture schedule.");
+    scheduleCache = await res.json();
+  }
+
+  const [nations, matches] = await Promise.all([
+    api("GET", "/nations"),
+    api("GET", "/matches"),
+  ]);
+  const idByName = nationIdMap(nations);
+
+  // Index recorded results by unordered nation-pair for pre-filling.
+  const stored = new Map();
+  for (const m of matches) {
+    stored.set(pairKey(m.nationAId, m.nationBId), m);
+  }
+
+  // Populate the group filter once.
+  const filter = document.getElementById("group-filter");
+  if (filter.options.length === 0) {
+    const groups = [...new Set(scheduleCache.fixtures.map((f) => f.group))].sort();
+    filter.innerHTML = `<option value="ALL">All</option>` +
+      groups.map((g) => `<option value="${g}">Group ${g}</option>`).join("");
+    filter.onchange = renderFixtures;
+  }
+
+  // Stash resolved data for the renderer.
+  container._data = { idByName, stored };
+  renderFixtures();
+}
+
+function renderFixtures() {
+  const container = document.getElementById("fixtures");
+  const data = container._data;
+  if (!data) return;
+  const { idByName, stored } = data;
+  const selected = document.getElementById("group-filter").value || "ALL";
+
+  const fixtures = scheduleCache.fixtures
+    .filter((f) => selected === "ALL" || f.group === selected)
+    .sort((a, b) => a.match - b.match);
+
+  container.innerHTML = "";
+  const ul = document.createElement("ul");
+  ul.className = "pill-list";
+
+  for (const f of fixtures) {
+    const aId = idByName.get(f.home);
+    const bId = idByName.get(f.away);
+    const li = document.createElement("li");
+    li.style.flexWrap = "wrap";
+
+    if (!aId || !bId) {
+      li.innerHTML = `<span class="muted">${escapeHtml(f.home)} v ${escapeHtml(f.away)} — team not found in database</span>`;
+      ul.appendChild(li);
+      continue;
+    }
+
+    const existing = stored.get(pairKey(aId, bId));
+    // Determine which stored side corresponds to home/away for pre-fill.
+    let homeGoals = "";
+    let awayGoals = "";
+    if (existing) {
+      if (existing.nationAId === aId) {
+        homeGoals = existing.goalsA; awayGoals = existing.goalsB;
+      } else {
+        homeGoals = existing.goalsB; awayGoals = existing.goalsA;
+      }
+    }
+
+    const label = document.createElement("span");
+    label.innerHTML =
+      `<strong>${f.group}${existing ? " ✓" : ""}</strong> ` +
+      `${escapeHtml(f.home)} <input type="number" min="0" max="99" style="width:3.5rem" value="${homeGoals}"> ` +
+      `– <input type="number" min="0" max="99" style="width:3.5rem" value="${awayGoals}"> ${escapeHtml(f.away)}`;
+    const inputs = label.querySelectorAll("input");
+
+    const save = document.createElement("button");
+    save.textContent = existing ? "Update" : "Save";
+    save.onclick = () => {
+      const gh = Number(inputs[0].value);
+      const ga = Number(inputs[1].value);
+      const body = { nationAId: aId, nationBId: bId, goalsA: gh, goalsB: ga };
+      const method = existing ? "PUT" : "POST";
+      run(() => api(method, "/matches", body), `Saved ${f.home} ${gh}–${ga} ${f.away}.`);
+    };
+
+    li.appendChild(label);
+    li.appendChild(save);
+    ul.appendChild(li);
+  }
+  container.appendChild(ul);
 }
 
 // --- Actions --------------------------------------------------------------
