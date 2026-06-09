@@ -22,9 +22,38 @@
       <p class="muted" id="token-state">No token saved. Writes will be rejected until you save one.</p>
     </div>
 
+    <div class="admin-wrap">
+      <fieldset>
+        <legend>Leagues</legend>
+        <div class="row">
+          <input id="league-name" placeholder="New league name (e.g. Work)" />
+          <button id="create-league" type="button">Create league</button>
+        </div>
+        <div class="row" style="margin-top:0.75rem">
+          <div>
+            <label for="active-league">Active league (for participant/assignment/finalize actions)</label>
+            <select id="active-league"></select>
+          </div>
+        </div>
+        <p class="muted" id="league-link"></p>
+      </fieldset>
+    </div>
+
     <main class="admin-wrap">
       <fieldset>
-        <legend>Participants</legend>
+        <legend>Sweepstake leagues</legend>
+        <p class="muted">Create a league for a group (e.g. "work", "friends"). Each gets its own link and view password. Results and teams are shared across all leagues; run each league's draw separately.</p>
+        <div class="row">
+          <div><label for="league-name-in">Name</label><input id="league-name-in" placeholder="Work" /></div>
+          <div><label for="league-slug-in">Link slug</label><input id="league-slug-in" placeholder="work" /></div>
+          <div><label for="league-pass-in">View password</label><input id="league-pass-in" placeholder="shared password" /></div>
+          <button id="create-league" type="button">Create</button>
+        </div>
+        <ul id="league-list" class="pill-list"></ul>
+      </fieldset>
+
+      <fieldset>
+        <legend>Participants (active league)</legend>
         <div class="row">
           <input id="participant-name" placeholder="Participant name" />
           <button id="add-participant" type="button">Add</button>
@@ -33,7 +62,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Nations</legend>
+        <legend>Nations (shared across all leagues)</legend>
         <div class="row">
           <input id="nation-name" placeholder="Nation name" />
           <button id="add-nation" type="button">Add</button>
@@ -42,8 +71,8 @@
       </fieldset>
 
       <fieldset>
-        <legend>Assignment</legend>
-        <p class="muted">Randomly assigns every nation to a participant.</p>
+        <legend>Assignment (active league)</legend>
+        <p class="muted">Randomly assigns every nation to a participant in the active league.</p>
         <div class="row">
           <button id="assign" type="button">Run assignment</button>
           <button id="assign-replace" type="button" class="secondary">Replace existing</button>

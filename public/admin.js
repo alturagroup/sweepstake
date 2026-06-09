@@ -111,8 +111,67 @@ async function refreshAll() {
   await Promise.all([
     refreshParticipants().catch((e) => toast(e.message, "err")),
     refreshNations().catch((e) => toast(e.message, "err")),
+    refreshLeagues().catch((e) => toast(e.message, "err")),
   ]);
   await refreshFixtures().catch((e) => toast(e.message, "err"));
+}
+
+// --- Leagues -------------------------------------------------------------
+
+async function refreshLeagues() {
+  const list = document.getElementById("league-list");
+  if (!list) return;
+  const leagues = await api("GET", "/api/leagues");
+  list.innerHTML = "";
+  if (!Array.isArray(leagues) || leagues.length === 0) {
+    list.innerHTML = '<li class="muted">No leagues yet.</li>';
+    return;
+  }
+  for (const lg of leagues) {
+    const li = document.createElement("li");
+    li.style.flexWrap = "wrap";
+    const link = `${location.origin}/l/${lg.slug}`;
+    const info = document.createElement("span");
+    info.innerHTML =
+      `<strong>${escapeHtml(lg.name)}</strong> ` +
+      `<a href="/l/${encodeURIComponent(lg.slug)}" target="_blank">${escapeHtml(link)}</a> ` +
+      `<span class="muted">— ${lg.participantCount} players${lg.assigned ? ", drawn" : ""}</span>`;
+
+    const controls = document.createElement("span");
+    controls.className = "row";
+    controls.style.flex = "1 1 100%";
+    controls.style.marginTop = "0.35rem";
+    controls.innerHTML =
+      `<input placeholder="Add player name" data-role="pname" style="flex:1 1 10rem" />`;
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Add player";
+    addBtn.onclick = () => {
+      const name = controls.querySelector('[data-role="pname"]').value.trim();
+      if (!name) return toast("Enter a player name.", "err");
+      run(async () => { await api("POST", `/api/leagues/${encodeURIComponent(lg.slug)}/participants`, { name }); }, "Player added.");
+    };
+    const drawBtn = document.createElement("button");
+    drawBtn.textContent = lg.assigned ? "Re-draw" : "Run draw";
+    drawBtn.className = "secondary";
+    drawBtn.onclick = () =>
+      run(() => api("POST", `/api/leagues/${encodeURIComponent(lg.slug)}/assign`, { confirmReplace: lg.assigned }), "Draw complete.");
+    const finBtn = document.createElement("button");
+    finBtn.textContent = "Finalize";
+    finBtn.className = "secondary";
+    finBtn.onclick = () => run(() => api("POST", `/api/leagues/${encodeURIComponent(lg.slug)}/finalize`), "League finalized.");
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.className = "secondary";
+    delBtn.onclick = () => { if (confirm(`Delete league "${lg.name}"? This cannot be undone.`)) run(() => api("DELETE", `/api/leagues/${encodeURIComponent(lg.slug)}`), "League deleted."); };
+
+    controls.appendChild(addBtn);
+    controls.appendChild(drawBtn);
+    controls.appendChild(finBtn);
+    controls.appendChild(delBtn);
+    li.appendChild(info);
+    li.appendChild(controls);
+    list.appendChild(li);
+  }
 }
 
 // --- Fixtures (group-stage schedule) -------------------------------------
@@ -291,6 +350,21 @@ document.getElementById("clear-token").onclick = () => {
 
 document.getElementById("add-participant").onclick = addParticipant;
 document.getElementById("add-nation").onclick = addNation;
+const createLeagueBtn = document.getElementById("create-league");
+if (createLeagueBtn) {
+  createLeagueBtn.onclick = () => {
+    const name = document.getElementById("league-name-in").value.trim();
+    const slug = document.getElementById("league-slug-in").value.trim();
+    const password = document.getElementById("league-pass-in").value;
+    if (!name || !slug || !password) return toast("Name, slug and password are all required.", "err");
+    run(async () => {
+      await api("POST", "/api/leagues", { name, slug, password });
+      document.getElementById("league-name-in").value = "";
+      document.getElementById("league-slug-in").value = "";
+      document.getElementById("league-pass-in").value = "";
+    }, "League created.");
+  };
+}
 document.getElementById("assign").onclick = () =>
   run(() => api("POST", "/assignments", {}), "Assignment complete.");
 document.getElementById("assign-replace").onclick = () =>

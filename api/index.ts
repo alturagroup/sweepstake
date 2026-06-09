@@ -14,10 +14,10 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { createRequestListener } from "../src/api/index.js";
+import { createLeagueRequestListener } from "../src/api/leagues.js";
 import { createSeededRng } from "../src/main.js";
-import { NeonSweepstakeRepository } from "../src/persistence/neon.js";
-import { SweepstakeService } from "../src/service/index.js";
+import { NeonMultiLeagueRepository } from "../src/persistence/leagues.js";
+import { MultiLeagueService } from "../src/service/leagues.js";
 
 /**
  * Lazily build (and memoize) the request listener for the lifetime of the warm
@@ -26,11 +26,11 @@ import { SweepstakeService } from "../src/service/index.js";
  * instance.
  */
 let listenerPromise:
-  | Promise<(req: IncomingMessage, res: ServerResponse) => void>
+  | Promise<(req: IncomingMessage, res: ServerResponse) => void | Promise<void>>
   | null = null;
 
 function getListener(): Promise<
-  (req: IncomingMessage, res: ServerResponse) => void
+  (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
 > {
   if (listenerPromise === null) {
     listenerPromise = (async () => {
@@ -40,9 +40,9 @@ function getListener(): Promise<
           "DATABASE_URL is required for the Vercel deployment (the JSON-file store cannot run on Vercel's ephemeral filesystem).",
         );
       }
-      const repository = await NeonSweepstakeRepository.create(databaseUrl);
-      const service = new SweepstakeService(repository, createSeededRng());
-      return createRequestListener(service);
+      const repository = await NeonMultiLeagueRepository.create(databaseUrl);
+      const service = new MultiLeagueService(repository, createSeededRng());
+      return createLeagueRequestListener(service);
     })();
     // If construction fails, clear the cache so a later invocation can retry
     // rather than permanently serving the rejected promise.
@@ -138,7 +138,7 @@ export default async function handler(
     return;
   }
 
-  let listener: (req: IncomingMessage, res: ServerResponse) => void;
+  let listener: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
   try {
     listener = await getListener();
   } catch (error: unknown) {
@@ -155,5 +155,5 @@ export default async function handler(
     );
     return;
   }
-  listener(req, res);
+  await listener(req, res);
 }

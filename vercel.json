@@ -1,4 +1,9 @@
 {
-  "outputDirectory": "public",
-  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+  "rewrites": [
+    { "source": "/api/leagues/(.*)", "destination": "/api/leagues" },
+    { "source": "/api/leagues", "destination": "/api/leagues" },
+    { "source": "/api/tournament/(.*)", "destination": "/api/leagues" },
+    { "source": "/l/(.*)", "destination": "/league.html" },
+    { "source": "/(.*)", "destination": "/api" }
+  ]
 }

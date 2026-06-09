@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sweepstake League</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-inner">
+        <div class="hero-title">
+          <span class="trophy">🏆</span>
+          <div>
+            <h1 id="league-name">SWEEPSTAKE LEAGUE</h1>
+            <p class="hero-sub">WORLD CUP 2026</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout" style="grid-template-columns:1fr;max-width:60rem">
+      <!-- Password gate -->
+      <section id="gate" class="card" hidden>
+        <h2>Enter league password</h2>
+        <p class="muted">This league is private. Enter the password your organiser shared.</p>
+        <div class="row" style="margin-top:0.75rem">
+          <input id="password" type="password" placeholder="League password" />
+          <button id="enter" type="button">Enter</button>
+        </div>
+        <p id="gate-error" class="muted"></p>
+      </section>
+
+      <!-- Standings -->
+      <section id="standings" class="card leaderboard" hidden>
+        <div class="card-head"><h2>LEAGUE LEADERBOARD</h2></div>
+        <div id="podium" class="podium" hidden></div>
+        <div id="league-status" class="muted">Loading…</div>
+        <table id="league-table" class="leaderboard-table" hidden>
+          <thead>
+            <tr><th>#</th><th>Player</th><th>Team(s)</th><th>W</th><th>D</th><th>L</th><th>Goals</th><th>PTS</th><th>Form</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p class="muted" id="prize-line" style="margin-top:1rem"></p>
+      </section>
+    </main>
+
+    <footer class="muted">Read-only view.</footer>
+    <script src="/league.js"></script>
+  </body>
+</html>

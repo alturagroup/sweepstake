@@ -35,6 +35,13 @@ body {
 }
 .hero-title { display: flex; align-items: center; gap: 0.9rem; }
 .trophy { font-size: 2.8rem; }
+.badge26 {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 3rem; height: 3rem; border-radius: 12px;
+  background: linear-gradient(135deg, var(--gold), #b8860b);
+  color: #0b1f3a; font-weight: 900; font-size: 1.5rem; letter-spacing: -0.05em;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+}
 .hero-title h1 { margin: 0; font-size: 2.1rem; letter-spacing: 0.04em; }
 .hero-sub { margin: 0; color: var(--gold); font-weight: 700; letter-spacing: 0.14em; }
 .hero-facts { display: flex; gap: 0.75rem; flex-wrap: wrap; }
