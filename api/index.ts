@@ -64,10 +64,17 @@ export default async function handler(
   try {
     listener = await getListener();
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to initialize service.";
+    // Never echo the raw error message: it can contain the connection string
+    // (including credentials). Log server-side, return a generic message.
+    console.error("Service initialization failed:", error);
     res.writeHead(500, { "content-type": "application/json" });
-    res.end(JSON.stringify({ code: "INITIALIZATION_ERROR", message }));
+    res.end(
+      JSON.stringify({
+        code: "INITIALIZATION_ERROR",
+        message:
+          "The service failed to initialize. Check that DATABASE_URL is configured correctly.",
+      }),
+    );
     return;
   }
   listener(req, res);
