@@ -11,3 +11,6 @@ data/
 .env
 .env.*
 !.env.example
+
+# Editor settings
+.vscode/
