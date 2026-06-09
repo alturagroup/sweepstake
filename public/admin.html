@@ -12,52 +12,31 @@
       <nav><a href="/">Standings</a> · <a href="/admin.html">Admin</a></nav>
     </header>
 
-    <div class="token-bar">
-      <label for="token">API token</label>
+    <!-- Login gate -->
+    <div id="login" class="token-bar" hidden>
+      <label for="admin-password">Admin password</label>
       <div class="row">
-        <input id="token" type="password" placeholder="Paste the API token" autocomplete="off" />
-        <button id="save-token" type="button">Save</button>
-        <button id="clear-token" type="button" class="secondary">Clear</button>
+        <input id="admin-password" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+        <button id="login-btn" type="button">Log in</button>
       </div>
-      <p class="muted" id="token-state">No token saved. Writes will be rejected until you save one.</p>
+      <p class="muted" id="login-state"></p>
     </div>
 
-    <div class="admin-wrap">
-      <fieldset>
-        <legend>Leagues</legend>
-        <div class="row">
-          <input id="league-name" placeholder="New league name (e.g. Work)" />
-          <button id="create-league" type="button">Create league</button>
-        </div>
-        <div class="row" style="margin-top:0.75rem">
-          <div>
-            <label for="active-league">Active league (for participant/assignment/finalize actions)</label>
-            <select id="active-league"></select>
-          </div>
-        </div>
-        <p class="muted" id="league-link"></p>
-      </fieldset>
-    </div>
+    <!-- Admin console (shown once logged in) -->
+    <main id="console" class="admin-wrap" hidden>
+      <p class="muted" style="text-align:right">
+        <button id="logout-btn" type="button" class="secondary">Log out</button>
+      </p>
 
-    <main class="admin-wrap">
       <fieldset>
         <legend>Sweepstake leagues</legend>
-        <p class="muted">Create a league for a group (e.g. "Work", "Friends"). Each gets its own <strong>unguessable share link</strong> — only people you send it to can find it. Password is optional. Results and teams are shared across all leagues; run each league's draw separately.</p>
+        <p class="muted">Create a league for a group (e.g. "Work", "Friends"). Each gets its own <strong>unguessable share link</strong> — only people you send it to can find it. Password is optional. Teams and results are shared across all leagues; run each league's draw separately.</p>
         <div class="row">
           <div><label for="league-name-in">Name</label><input id="league-name-in" placeholder="Work" /></div>
           <div><label for="league-pass-in">View password (optional)</label><input id="league-pass-in" placeholder="leave blank for link-only" /></div>
           <button id="create-league" type="button">Create</button>
         </div>
         <ul id="league-list" class="pill-list"></ul>
-      </fieldset>
-
-      <fieldset>
-        <legend>Participants (active league)</legend>
-        <div class="row">
-          <input id="participant-name" placeholder="Participant name" />
-          <button id="add-participant" type="button">Add</button>
-        </div>
-        <ul id="participant-list" class="pill-list"></ul>
       </fieldset>
 
       <fieldset>
@@ -70,33 +49,12 @@
       </fieldset>
 
       <fieldset>
-        <legend>Assignment (active league)</legend>
-        <p class="muted">Randomly assigns every nation to a participant in the active league.</p>
+        <legend>Record / update match (shared)</legend>
         <div class="row">
-          <button id="assign" type="button">Run assignment</button>
-          <button id="assign-replace" type="button" class="secondary">Replace existing</button>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Record / update match</legend>
-        <div class="row">
-          <div>
-            <label for="match-a">Nation A</label>
-            <select id="match-a"></select>
-          </div>
-          <div>
-            <label for="goals-a">Goals A</label>
-            <input id="goals-a" type="number" min="0" max="99" value="0" />
-          </div>
-          <div>
-            <label for="match-b">Nation B</label>
-            <select id="match-b"></select>
-          </div>
-          <div>
-            <label for="goals-b">Goals B</label>
-            <input id="goals-b" type="number" min="0" max="99" value="0" />
-          </div>
+          <div><label for="match-a">Nation A</label><select id="match-a"></select></div>
+          <div><label for="goals-a">Goals A</label><input id="goals-a" type="number" min="0" max="99" value="0" /></div>
+          <div><label for="match-b">Nation B</label><select id="match-b"></select></div>
+          <div><label for="goals-b">Goals B</label><input id="goals-b" type="number" min="0" max="99" value="0" /></div>
         </div>
         <div class="row">
           <button id="record-match" type="button">Record</button>
@@ -105,7 +63,7 @@
       </fieldset>
 
       <fieldset>
-        <legend>Group-stage fixtures</legend>
+        <legend>Group-stage fixtures (shared)</legend>
         <p class="muted">Enter a score and press Save to record (or update) each result. Knockout matches are recorded manually above once teams are known.</p>
         <div class="row">
           <label for="group-filter" style="flex:0 0 auto;align-self:center;margin:0">Group</label>
@@ -115,16 +73,10 @@
       </fieldset>
 
       <fieldset>
-        <legend>Prizes</legend>
+        <legend>Champion (shared)</legend>
         <div class="row">
-          <div>
-            <label for="champion">Champion nation</label>
-            <select id="champion"></select>
-          </div>
+          <div><label for="champion">Champion nation</label><select id="champion"></select></div>
           <button id="record-champion" type="button">Record champion</button>
-        </div>
-        <div class="row" style="margin-top:0.75rem">
-          <button id="finalize" type="button">Finalize league</button>
         </div>
       </fieldset>
     </main>

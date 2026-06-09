@@ -1,159 +1,77 @@
-// Vercel serverless entry point.
+// Admin authentication endpoints (Vercel serverless).
 //
-// Vercel runs serverless functions, not a long-lived HTTP server, so the
-// persistent `createApp().listen()` bootstrap in src/main.ts cannot be used
-// here. Instead this function reuses the shared request listener
-// (`createRequestListener`) — the same routing/validation/error-mapping the
-// standalone server uses — and is invoked once per request.
+// Handles the admin login/logout used by the web admin UI, so admins sign in
+// with a friendly password instead of pasting the API_TOKEN. On success a
+// signed HttpOnly session cookie is set; the league API accepts that cookie
+// (or the bearer token) to authorize writes.
 //
-// Persistence MUST be Neon: Vercel's filesystem is read-only/ephemeral, so the
-// JSON-file store would fail. `DATABASE_URL` is therefore required and is
-// validated at module load. The service is built once per cold start and
-// reused across invocations on the same warm instance.
+// Routes (mapped here via vercel.json):
+//   POST /api/login    { password }  -> sets admin_session cookie
+//   POST /api/logout                 -> clears the cookie
+//   GET  /api/session                -> { authenticated: boolean }
+//
+// The old single-tenant sweepstake routes have been removed; the multi-league
+// API (api/leagues.ts) is the live surface.
 
-import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { createLeagueRequestListener } from "../src/api/leagues.js";
-import { createSeededRng } from "../src/main.js";
-import { NeonMultiLeagueRepository } from "../src/persistence/leagues.js";
-import { MultiLeagueService } from "../src/service/leagues.js";
+import {
+  adminCookieHeader,
+  adminCookieOk,
+  checkAdminPassword,
+  clearAdminCookieHeader,
+} from "../src/auth.js";
 
-/**
- * Lazily build (and memoize) the request listener for the lifetime of the warm
- * serverless instance. The Neon schema is ensured on first use; subsequent
- * invocations reuse the same promise so the table check runs at most once per
- * instance.
- */
-let listenerPromise:
-  | Promise<(req: IncomingMessage, res: ServerResponse) => void | Promise<void>>
-  | null = null;
-
-function getListener(): Promise<
-  (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
-> {
-  if (listenerPromise === null) {
-    listenerPromise = (async () => {
-      const databaseUrl = process.env.DATABASE_URL;
-      if (!databaseUrl || databaseUrl.trim().length === 0) {
-        throw new Error(
-          "DATABASE_URL is required for the Vercel deployment (the JSON-file store cannot run on Vercel's ephemeral filesystem).",
-        );
-      }
-      const repository = await NeonMultiLeagueRepository.create(databaseUrl);
-      const service = new MultiLeagueService(repository, createSeededRng());
-      return createLeagueRequestListener(service);
-    })();
-    // If construction fails, clear the cache so a later invocation can retry
-    // rather than permanently serving the rejected promise.
-    listenerPromise.catch(() => {
-      listenerPromise = null;
-    });
-  }
-  return listenerPromise;
+function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
+  res.writeHead(status, { "content-type": "application/json", ...headers });
+  res.end(JSON.stringify(body));
 }
 
-/**
- * Constant-time comparison of two strings. Avoids leaking, via response
- * timing, how many leading characters of a guessed token were correct.
- * Returns false for length mismatches (after a dummy compare to keep timing
- * roughly uniform).
- */
-function safeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    // Compare against itself so the work done is independent of which input
-    // differed; still returns false on the length mismatch.
-    timingSafeEqual(aBuf, aBuf);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
+async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (raw.length === 0) return {};
+  const parsed = JSON.parse(raw);
+  return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {};
 }
 
-/**
- * Enforce bearer-token authentication for state-changing requests.
- *
- * Read-only requests (GET/HEAD/OPTIONS) are public so players can view the
- * league table and prizes without a credential. Every write (POST/PUT/DELETE,
- * etc.) requires `Authorization: Bearer <API_TOKEN>`.
- *
- * The expected token is read from `API_TOKEN`. When it is unset, writes fail
- * closed (503) rather than running unprotected; reads remain available.
- *
- * Returns true when the request may proceed; otherwise writes the appropriate
- * 401/503 response and returns false.
- */
-function isAuthorized(req: IncomingMessage, res: ServerResponse): boolean {
-  const method = (req.method ?? "GET").toUpperCase();
-  const isRead = method === "GET" || method === "HEAD" || method === "OPTIONS";
-  if (isRead) {
-    return true;
-  }
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const method = req.method ?? "GET";
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const path = url.pathname.replace(/\/+$/, "") || "/";
 
-  const expected = process.env.API_TOKEN;
-  if (!expected || expected.trim().length === 0) {
-    res.writeHead(503, { "content-type": "application/json" });
-    res.end(
-      JSON.stringify({
-        code: "AUTH_NOT_CONFIGURED",
-        message: "The API is not configured for writes. Set API_TOKEN.",
-      }),
-    );
-    return false;
-  }
-
-  const header = req.headers.authorization ?? "";
-  const match = /^Bearer\s+(.+)$/i.exec(header);
-  const provided = match?.[1]?.trim();
-
-  if (provided === undefined || !safeEqual(provided, expected)) {
-    res.writeHead(401, {
-      "content-type": "application/json",
-      "www-authenticate": "Bearer",
-    });
-    res.end(
-      JSON.stringify({
-        code: "UNAUTHORIZED",
-        message: "A valid bearer token is required for this operation.",
-      }),
-    );
-    return false;
-  }
-  return true;
-}
-
-/**
- * Vercel Node serverless handler. `req`/`res` are Node
- * `IncomingMessage`/`ServerResponse`, which the shared listener already speaks.
- *
- * Reads are public; writes require `Authorization: Bearer <API_TOKEN>`.
- * Unauthorized writes are rejected before the service is touched.
- */
-export default async function handler(
-  req: IncomingMessage,
-  res: ServerResponse,
-): Promise<void> {
-  if (!isAuthorized(req, res)) {
-    return;
-  }
-
-  let listener: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
   try {
-    listener = await getListener();
-  } catch (error: unknown) {
-    // Never echo the raw error message: it can contain the connection string
-    // (including credentials). Log server-side, return a generic message.
-    console.error("Service initialization failed:", error);
-    res.writeHead(500, { "content-type": "application/json" });
-    res.end(
-      JSON.stringify({
-        code: "INITIALIZATION_ERROR",
-        message:
-          "The service failed to initialize. Check that DATABASE_URL is configured correctly.",
-      }),
-    );
-    return;
+    if (path === "/api/login" && method === "POST") {
+      if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.trim().length === 0) {
+        sendJson(res, 503, { code: "AUTH_NOT_CONFIGURED", message: "Set ADMIN_PASSWORD to enable admin login." });
+        return;
+      }
+      const body = await readBody(req);
+      if (!checkAdminPassword(String(body.password ?? ""))) {
+        sendJson(res, 401, { code: "BAD_PASSWORD", message: "Incorrect admin password." });
+        return;
+      }
+      sendJson(res, 200, { ok: true }, { "set-cookie": adminCookieHeader() });
+      return;
+    }
+
+    if (path === "/api/logout" && method === "POST") {
+      sendJson(res, 200, { ok: true }, { "set-cookie": clearAdminCookieHeader() });
+      return;
+    }
+
+    if (path === "/api/session" && method === "GET") {
+      sendJson(res, 200, { authenticated: adminCookieOk(req.headers.cookie) });
+      return;
+    }
+
+    sendJson(res, 404, { code: "NOT_FOUND", message: `No route for ${method} ${path}.` });
+  } catch (e) {
+    if (e instanceof SyntaxError) { sendJson(res, 400, { code: "INVALID_JSON", message: "Body is not valid JSON." }); return; }
+    console.error("Auth handler error:", e);
+    sendJson(res, 500, { code: "INTERNAL_ERROR", message: "An unexpected error occurred." });
   }
-  await listener(req, res);
 }

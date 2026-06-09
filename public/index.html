@@ -17,18 +17,28 @@
           </div>
         </div>
       </div>
-      <nav class="topnav"><a href="/">Leagues</a> · <a href="/admin.html">Admin</a></nav>
     </header>
 
-    <main class="layout" style="grid-template-columns:1fr">
+    <main class="layout" style="grid-template-columns:1fr;max-width:46rem">
       <section class="card">
-        <h2>SWEEPSTAKE LEAGUES</h2>
-        <p class="muted">Pick a league to see its standings.</p>
-        <div id="league-list" class="muted">Loading…</div>
+        <h2>Welcome</h2>
+        <p>This is a private World Cup sweepstake. Standings are organised into separate <strong>leagues</strong> (for example one for work, one for friends).</p>
+        <p class="muted">To view your league, open the <strong>private link</strong> your organiser shared with you — it looks like <code>/l/your-league-xxxxxxxx</code>. There is no public list of leagues.</p>
+        <p style="margin-top:1.25rem">
+          <a href="/admin.html"><button type="button">Admin login</button></a>
+        </p>
       </section>
+
+      <aside class="card">
+        <h3>HOW POINTS ARE AWARDED</h3>
+        <ul class="points-list">
+          <li><span>Win</span><span class="pts">3 PTS</span></li>
+          <li><span>Draw</span><span class="pts">1 PT</span></li>
+          <li><span>Goal scored <small>(any goal by your team)</small></span><span class="pts">1 PT</span></li>
+        </ul>
+      </aside>
     </main>
 
-    <footer class="muted">Read-only view. Updates are made by the administrator.</footer>
-    <script src="/leagues-index.js"></script>
+    <footer class="muted">Organisers manage teams, results and leagues from the admin page.</footer>
   </body>
 </html>

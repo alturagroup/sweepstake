@@ -1,9 +1,11 @@
 {
   "rewrites": [
+    { "source": "/api/login", "destination": "/api" },
+    { "source": "/api/logout", "destination": "/api" },
+    { "source": "/api/session", "destination": "/api" },
     { "source": "/api/leagues/(.*)", "destination": "/api/leagues" },
     { "source": "/api/leagues", "destination": "/api/leagues" },
     { "source": "/api/tournament/(.*)", "destination": "/api/leagues" },
-    { "source": "/l/(.*)", "destination": "/league.html" },
-    { "source": "/(.*)", "destination": "/api" }
+    { "source": "/l/(.*)", "destination": "/league.html" }
   ]
 }

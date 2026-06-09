@@ -26,6 +26,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { writeAuthorized } from "../src/auth.js";
 import { createSeededRng } from "../src/main.js";
 import { NeonLeagueRepository } from "../src/persistence/leagues.js";
 import { LeagueService } from "../src/service/leagues.js";
@@ -66,14 +67,9 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
 }
 
 function tokenOk(req: IncomingMessage): boolean {
-  const expected = process.env.API_TOKEN;
-  if (!expected || expected.trim().length === 0) return false;
-  const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "");
-  const provided = m?.[1]?.trim();
-  if (provided === undefined) return false;
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  // Authorize admin/write actions via either the bearer token (scripts) or the
+  // admin session cookie (web UI login).
+  return writeAuthorized(req.headers.authorization, req.headers.cookie);
 }
 
 /** Secret used to sign league view cookies. Falls back to API_TOKEN. */
