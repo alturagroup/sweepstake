@@ -2,82 +2,136 @@
   --fg: #1a1a1a;
   --muted: #6b7280;
   --line: #e5e7eb;
-  --accent: #1d4ed8;
+  --green: #16a34a;
+  --gold: #d4a017;
   --bg-soft: #f8fafc;
+  --navy: #0b1f3a;
 }
 
 * { box-sizing: border-box; }
 
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  max-width: 52rem;
-  margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
-  line-height: 1.55;
+  margin: 0;
+  background: #f3f4f6;
   color: var(--fg);
+  line-height: 1.5;
 }
 
-header { border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
-header h1 { margin: 0 0 0.25rem; }
-nav a { color: var(--accent); text-decoration: none; }
-nav a:hover { text-decoration: underline; }
-
-h2 { margin-top: 2rem; }
-
-section { margin-bottom: 1rem; }
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin-top: 0.5rem;
+/* --- Hero ---------------------------------------------------------------- */
+.hero {
+  background: linear-gradient(120deg, #0b1f3a 0%, #11294d 55%, #163057 100%);
+  color: #fff;
+  padding: 1.5rem 1.25rem 0.75rem;
 }
-th, td {
-  text-align: left;
-  padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--line);
+.hero-inner {
+  max-width: 70rem;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
 }
-th { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
-tbody tr:nth-child(odd) { background: var(--bg-soft); }
+.hero-title { display: flex; align-items: center; gap: 0.9rem; }
+.trophy { font-size: 2.8rem; }
+.hero-title h1 { margin: 0; font-size: 2.1rem; letter-spacing: 0.04em; }
+.hero-sub { margin: 0; color: var(--gold); font-weight: 700; letter-spacing: 0.14em; }
+.hero-facts { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.fact {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  display: flex; flex-direction: column; gap: 0.15rem;
+  min-width: 8rem;
+}
+.fact-label { font-size: 0.65rem; letter-spacing: 0.1em; color: #9fb3cc; }
+.fact-value { font-size: 1.15rem; font-weight: 700; color: var(--gold); }
+.topnav { max-width: 70rem; margin: 0.75rem auto 0; }
+.topnav a { color: #cfe0f5; text-decoration: none; }
+.topnav a:hover { text-decoration: underline; }
 
+/* --- Layout -------------------------------------------------------------- */
+.layout {
+  max-width: 70rem;
+  margin: 1.5rem auto;
+  padding: 0 1.25rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.25rem;
+}
+@media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; }
+h2 { margin: 0 0 0.2rem; font-size: 1.1rem; letter-spacing: 0.03em; }
+h3 { margin: 0 0 0.75rem; font-size: 0.95rem; letter-spacing: 0.03em; }
 .muted { color: var(--muted); }
 
+/* --- Podium -------------------------------------------------------------- */
+.podium { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem; align-items: end; margin: 1rem 0 1.25rem; }
+.podium .slot { border-radius: 12px; padding: 0.9rem 0.6rem; text-align: center; border: 1px solid var(--line); }
+.podium .rank-num { font-size: 1.6rem; font-weight: 800; color: var(--muted); }
+.podium .name { font-weight: 700; }
+.podium .team { font-size: 0.8rem; color: var(--muted); }
+.podium .pts { font-size: 1.25rem; font-weight: 800; margin-top: 0.25rem; }
+.podium .first { background: linear-gradient(180deg,#fff7e0,#fdeec2); border-color: #f0d68a; transform: translateY(-10px); }
+.podium .first .rank-num, .podium .first .pts { color: var(--gold); }
+.podium .second { background: linear-gradient(180deg,#f3f4f6,#e8eaed); }
+.podium .third { background: linear-gradient(180deg,#f7ece4,#f0ddcd); }
+
+/* --- Leaderboard table --------------------------------------------------- */
+.leaderboard-table { border-collapse: collapse; width: 100%; }
+.leaderboard-table th, .leaderboard-table td { padding: 0.5rem 0.55rem; text-align: left; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+.leaderboard-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.leaderboard-table td.num, .leaderboard-table th.num { text-align: center; }
+.leaderboard-table .pts-cell { font-weight: 800; }
+.leaderboard-table tbody tr:hover { background: var(--bg-soft); }
+
+.form { display: inline-flex; gap: 3px; }
+.form .dot { width: 18px; height: 18px; border-radius: 50%; color: #fff; font-size: 0.62rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.form .w { background: var(--green); }
+.form .d { background: #9ca3af; }
+.form .l { background: #dc2626; }
+
+/* --- Sidebar panels ------------------------------------------------------ */
+.points-list, .pts { list-style: none; }
+.points-list { padding: 0; margin: 0; }
+.points-list li { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+.points-list li:last-child { border-bottom: 0; }
+.points-list .pts { color: var(--green); font-weight: 700; }
+.points-list small { color: var(--muted); }
+
+.prize-card { text-align: center; }
+.prize-big { font-size: 2.6rem; font-weight: 800; color: var(--green); }
+
+footer { max-width: 70rem; margin: 1rem auto 2.5rem; padding: 0 1.25rem; }
+
+/* --- Admin reuse --------------------------------------------------------- */
 label { display: block; font-weight: 600; margin: 0.75rem 0 0.25rem; }
-input, select, button, textarea {
-  font: inherit;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-input, select, textarea { width: 100%; }
-button {
-  cursor: pointer;
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  font-weight: 600;
-}
-button.secondary { background: #fff; color: var(--accent); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 1rem 0; padding: 0.75rem 1rem 1.25rem; }
+input, select, button { font: inherit; padding: 0.45rem 0.55rem; border: 1px solid var(--line); border-radius: 6px; }
+input, select { width: 100%; }
+button { cursor: pointer; background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
+button.secondary { background: #fff; color: var(--green); }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 1rem 0; padding: 0.75rem 1rem 1.25rem; background: #fff; }
 legend { font-weight: 700; padding: 0 0.4rem; }
-
 .row { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
 .row > * { flex: 1 1 8rem; }
 .row > button { flex: 0 0 auto; }
-
-.toast {
-  position: fixed;
-  bottom: 1rem; left: 50%; transform: translateX(-50%);
-  padding: 0.6rem 1rem; border-radius: 8px; color: #fff;
-  font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-  opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: 90vw;
-}
+.toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); padding: 0.6rem 1rem; border-radius: 8px; color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.18); opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: 90vw; }
 .toast.show { opacity: 1; }
-.toast.ok { background: #16a34a; }
+.toast.ok { background: var(--green); }
 .toast.err { background: #dc2626; }
-
-.token-bar { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+.token-bar { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 1rem; margin: 1rem; }
 .pill-list { list-style: none; padding: 0; margin: 0.5rem 0 0; }
-.pill-list li { padding: 0.35rem 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 0.5rem; }
+.pill-list li { padding: 0.35rem 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; }
 .pill-list button { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+.admin-wrap { max-width: 60rem; margin: 0 auto; padding: 0 1.25rem 3rem; }

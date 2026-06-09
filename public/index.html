@@ -3,41 +3,89 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>World Cup Sweepstake</title>
+    <title>World Cup Sweepstake 2026</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header>
-      <h1>World Cup Sweepstake</h1>
-      <nav><a href="/">Standings</a> · <a href="/admin.html">Admin</a></nav>
+    <header class="hero">
+      <div class="hero-inner">
+        <div class="hero-title">
+          <span class="trophy">🏆</span>
+          <div>
+            <h1>WORLD CUP</h1>
+            <p class="hero-sub">SWEEPSTAKE 2026</p>
+          </div>
+        </div>
+        <div class="hero-facts">
+          <div class="fact">
+            <span class="fact-label">WINNER TAKES ALL</span>
+            <span class="fact-value" id="prize-amount">£500</span>
+          </div>
+          <div class="fact">
+            <span class="fact-label">FINAL</span>
+            <span class="fact-value" id="final-date">19 JULY 2026</span>
+          </div>
+          <div class="fact">
+            <span class="fact-label">COUNTDOWN TO FINAL</span>
+            <span class="fact-value" id="countdown">—</span>
+          </div>
+        </div>
+      </div>
+      <nav class="topnav"><a href="/">Standings</a> · <a href="/admin.html">Admin</a></nav>
     </header>
 
-    <main>
-      <section>
-        <h2>League Table</h2>
+    <main class="layout">
+      <section class="card leaderboard">
+        <div class="card-head">
+          <div>
+            <h2>LEAGUE LEADERBOARD</h2>
+            <p class="muted">The race for the <span id="prize-inline">£500</span> prize</p>
+          </div>
+        </div>
+
+        <div id="podium" class="podium" hidden></div>
+
         <div id="league-status" class="muted">Loading…</div>
-        <table id="league-table" hidden>
+        <table id="league-table" class="leaderboard-table" hidden>
           <thead>
-            <tr><th>Rank</th><th>Participant</th><th>Points</th></tr>
+            <tr>
+              <th>#</th><th>Player</th><th>Team(s)</th>
+              <th>W</th><th>D</th><th>L</th><th>Goals</th><th>PTS</th><th>Form</th>
+            </tr>
           </thead>
           <tbody></tbody>
         </table>
       </section>
 
-      <section>
-        <h2>Prizes</h2>
-        <p><strong>Tournament winner:</strong> <span id="tournament-winner" class="muted">—</span></p>
-        <p><strong>League prize:</strong> <span id="league-prize" class="muted">—</span></p>
-      </section>
+      <aside class="sidebar">
+        <section class="card">
+          <h3>HOW POINTS ARE AWARDED</h3>
+          <ul class="points-list">
+            <li><span>Win</span><span class="pts">3 PTS</span></li>
+            <li><span>Draw</span><span class="pts">1 PT</span></li>
+            <li><span>Goal scored <small>(any goal by your team)</small></span><span class="pts">1 PT</span></li>
+          </ul>
+        </section>
 
-      <section>
-        <h2>Assignments</h2>
-        <div id="assignments" class="muted">Loading…</div>
-      </section>
+        <section class="card prize-card">
+          <h3>WINNER TAKES ALL</h3>
+          <div class="prize-big" id="prize-big">£500</div>
+          <p class="muted">To the player with the most points at the end of the tournament.</p>
+        </section>
+
+        <section class="card">
+          <h3>🏆 WORLD CUP WINNER</h3>
+          <p class="muted" id="tournament-winner-line">Holder of the champion nation — decided at the final.</p>
+        </section>
+
+        <section class="card">
+          <h3>League prize</h3>
+          <p class="muted" id="league-prize-line">Not finalized yet.</p>
+        </section>
+      </aside>
     </main>
 
     <footer class="muted">Read-only view. Updates are made by the administrator.</footer>
-
     <script src="/app.js"></script>
   </body>
 </html>
