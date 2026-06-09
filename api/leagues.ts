@@ -164,6 +164,16 @@ async function route(service: LeagueService, req: IncomingMessage, res: ServerRe
       if (method === "POST") { const b = await readBody(req); return finish(res, await service.recordChampion(String(b.nationId ?? ""))); }
       return methodNotAllowed(res);
     }
+    if (sub === "knockout") {
+      if (method === "GET") return sendJson(res, 200, await service.getKnockout());
+      if (method === "PUT") {
+        const b = await readBody(req);
+        const a = b.nationAId == null || b.nationAId === "" ? null : String(b.nationAId);
+        const bb = b.nationBId == null || b.nationBId === "" ? null : String(b.nationBId);
+        return finishMaybe(res, await service.setKnockoutSlot(String(b.slotId ?? ""), a, bb));
+      }
+      return methodNotAllowed(res);
+    }
     return notFound(res, method, url.pathname);
   }
 

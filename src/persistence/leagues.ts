@@ -23,6 +23,19 @@ export interface TournamentState {
   nations: Nation[];
   matches: Match[];
   championNationId: Id | null;
+  /** The knockout bracket (Round of 32 → Final). May be absent in old rows. */
+  knockoutSlots?: KnockoutSlot[];
+}
+
+/** A single knockout bracket slot. Teams are filled in by the admin as the
+ *  tournament progresses; null means "not decided yet". A slot's score is
+ *  stored in the shared `matches` array keyed by its two nation ids, so
+ *  knockout results count toward points exactly like group games. */
+export interface KnockoutSlot {
+  id: string;
+  round: string;
+  nationAId: Id | null;
+  nationBId: Id | null;
 }
 
 /** A single sweepstake league (one group of friends/colleagues). */
@@ -45,9 +58,38 @@ export interface League {
   includedNationIds: Id[] | null;
 }
 
+/** Build the empty knockout bracket: 16 R32, 8 R16, 4 QF, 2 SF, Bronze, Final. */
+export function defaultKnockoutSlots(): KnockoutSlot[] {
+  const slots: KnockoutSlot[] = [];
+  const rounds: Array<{ round: string; count: number; prefix: string }> = [
+    { round: "Round of 32", count: 16, prefix: "R32" },
+    { round: "Round of 16", count: 8, prefix: "R16" },
+    { round: "Quarter-final", count: 4, prefix: "QF" },
+    { round: "Semi-final", count: 2, prefix: "SF" },
+    { round: "Third place", count: 1, prefix: "BRONZE" },
+    { round: "Final", count: 1, prefix: "FINAL" },
+  ];
+  for (const r of rounds) {
+    for (let i = 1; i <= r.count; i++) {
+      slots.push({
+        id: r.count === 1 ? r.prefix : `${r.prefix}-${i}`,
+        round: r.round,
+        nationAId: null,
+        nationBId: null,
+      });
+    }
+  }
+  return slots;
+}
+
 /** A fresh, empty shared tournament. */
 export function emptyTournament(): TournamentState {
-  return { nations: [], matches: [], championNationId: null };
+  return {
+    nations: [],
+    matches: [],
+    championNationId: null,
+    knockoutSlots: defaultKnockoutSlots(),
+  };
 }
 
 /**
@@ -102,7 +144,12 @@ export class NeonLeagueRepository {
     const rows = (await this.sql`
       SELECT state FROM tournament_state WHERE id = 1
     `) as Array<{ state: TournamentState }>;
-    return rows[0]?.state ?? emptyTournament();
+    const state = rows[0]?.state ?? emptyTournament();
+    // Backfill the bracket for documents saved before knockouts existed.
+    if (!state.knockoutSlots || state.knockoutSlots.length === 0) {
+      state.knockoutSlots = defaultKnockoutSlots();
+    }
+    return state;
   }
 
   async saveTournament(state: TournamentState): Promise<void> {

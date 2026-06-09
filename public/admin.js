@@ -358,12 +358,116 @@ async function toggleTeamPicker(lg, li) {
   li.appendChild(box);
 }
 
+// --- Knockout bracket -----------------------------------------------------
+
+async function refreshKnockout() {
+  const container = document.getElementById("knockout");
+  if (allNationsCache === null) allNationsCache = await api("GET", "/api/tournament/nations");
+  const [slots, matches] = await Promise.all([
+    api("GET", "/api/tournament/knockout"),
+    api("GET", "/api/tournament/matches"),
+  ]);
+  const stored = new Map();
+  for (const m of matches) stored.set(pairKey(m.nationAId, m.nationBId), m);
+  const nameById = new Map(allNationsCache.map((n) => [n.id, n.displayName]));
+
+  // Round filter.
+  const filter = document.getElementById("ko-round-filter");
+  if (filter.options.length === 0) {
+    const rounds = [...new Set(slots.map((s) => s.round))];
+    filter.innerHTML = rounds.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+    filter.onchange = () => renderKnockout(slots, stored, nameById);
+  }
+  container._ko = { slots, stored, nameById };
+  renderKnockout(slots, stored, nameById);
+}
+
+function nationOptions(selectedId) {
+  let html = `<option value="">— TBD —</option>`;
+  const sorted = [...allNationsCache].sort((a, b) => a.displayName.localeCompare(b.displayName));
+  for (const n of sorted) {
+    html += `<option value="${n.id}"${n.id === selectedId ? " selected" : ""}>${escapeHtml(n.displayName)}</option>`;
+  }
+  return html;
+}
+
+function renderKnockout(slots, stored, nameById) {
+  const container = document.getElementById("knockout");
+  const round = document.getElementById("ko-round-filter").value || slots[0]?.round;
+  container.innerHTML = "";
+  const ul = document.createElement("ul");
+  ul.className = "pill-list";
+
+  for (const slot of slots.filter((s) => s.round === round)) {
+    const li = document.createElement("li");
+    li.style.flexWrap = "wrap";
+
+    // Team selectors row.
+    const sel = document.createElement("span");
+    sel.className = "row";
+    sel.style.flex = "1 1 100%";
+    sel.innerHTML =
+      `<strong style="flex:0 0 4rem">${escapeHtml(slot.id)}</strong>` +
+      `<select data-role="a" style="flex:1 1 9rem">${nationOptions(slot.nationAId)}</select>` +
+      `<span style="flex:0 0 auto;align-self:center">v</span>` +
+      `<select data-role="b" style="flex:1 1 9rem">${nationOptions(slot.nationBId)}</select>`;
+    const aSel = sel.querySelector('[data-role="a"]');
+    const bSel = sel.querySelector('[data-role="b"]');
+    const setBtn = document.createElement("button");
+    setBtn.textContent = "Set teams"; setBtn.className = "secondary";
+    setBtn.onclick = () => run(
+      () => api("PUT", "/api/tournament/knockout", { slotId: slot.id, nationAId: aSel.value, nationBId: bSel.value }),
+      `${slot.id} teams set.`,
+    );
+    sel.appendChild(setBtn);
+    li.appendChild(sel);
+
+    // Score row, only when both teams are decided.
+    if (slot.nationAId && slot.nationBId) {
+      const existing = stored.get(pairKey(slot.nationAId, slot.nationBId));
+      let ga = "", gb = "";
+      if (existing) {
+        if (existing.nationAId === slot.nationAId) { ga = existing.goalsA; gb = existing.goalsB; }
+        else { ga = existing.goalsB; gb = existing.goalsA; }
+      }
+      const scoreRow = document.createElement("span");
+      scoreRow.className = "row";
+      scoreRow.style.flex = "1 1 100%";
+      scoreRow.style.marginTop = "0.35rem";
+      scoreRow.innerHTML =
+        `<span style="flex:1 1 9rem">${escapeHtml(nameById.get(slot.nationAId) || "?")} ${existing ? "✓" : ""}</span>` +
+        `<input type="number" min="0" max="99" data-role="ga" value="${ga}" style="flex:0 0 4rem">` +
+        `<input type="number" min="0" max="99" data-role="gb" value="${gb}" style="flex:0 0 4rem">` +
+        `<span style="flex:1 1 9rem">${escapeHtml(nameById.get(slot.nationBId) || "?")}</span>`;
+      const gaIn = scoreRow.querySelector('[data-role="ga"]');
+      const gbIn = scoreRow.querySelector('[data-role="gb"]');
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = existing ? "Update score" : "Save score";
+      saveBtn.onclick = () => {
+        const body = { nationAId: slot.nationAId, nationBId: slot.nationBId, goalsA: Number(gaIn.value), goalsB: Number(gbIn.value) };
+        run(() => api(existing ? "PUT" : "POST", "/api/tournament/matches", body), "Score saved.");
+      };
+      scoreRow.appendChild(saveBtn);
+      if (existing) {
+        const clr = document.createElement("button");
+        clr.textContent = "Clear"; clr.className = "secondary";
+        clr.onclick = () => { if (confirm("Delete this knockout result?")) run(() => api("DELETE", "/api/tournament/matches", { nationAId: slot.nationAId, nationBId: slot.nationBId }), "Score cleared."); };
+        scoreRow.appendChild(clr);
+      }
+      li.appendChild(scoreRow);
+    }
+    ul.appendChild(li);
+  }
+  container.appendChild(ul);
+}
+
 async function refreshAll() {
   await Promise.all([
     refreshNations().catch((e) => toast(e.message, "err")),
     refreshLeagues().catch((e) => toast(e.message, "err")),
   ]);
   await refreshFixtures().catch((e) => toast(e.message, "err"));
+  await refreshKnockout().catch((e) => toast(e.message, "err"));
 }
 
 // --- Wire up --------------------------------------------------------------

@@ -74,6 +74,16 @@
       </fieldset>
 
       <fieldset>
+        <legend>Knockout bracket (shared)</legend>
+        <p class="muted">Pick the two teams for each tie as they're decided, then enter the score. Knockout scores count toward points like group games. Use the manual section above only if you need a tie not listed here.</p>
+        <div class="row">
+          <label for="ko-round-filter" style="flex:0 0 auto;align-self:center;margin:0">Round</label>
+          <select id="ko-round-filter" style="flex:0 0 12rem"></select>
+        </div>
+        <div id="knockout" class="muted">Loading bracket…</div>
+      </fieldset>
+
+      <fieldset>
         <legend>Champion (shared)</legend>
         <div class="row">
           <div><label for="champion">Champion nation</label><select id="champion"></select></div>

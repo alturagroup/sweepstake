@@ -185,6 +185,38 @@ export class LeagueService {
     return listMatches(this.compose(t, emptyLeagueShell()));
   }
 
+  /** Return the knockout bracket slots (with their teams, if decided). */
+  async getKnockout() {
+    const t = await this.repo.loadTournament();
+    return t.knockoutSlots ?? [];
+  }
+
+  /**
+   * Set the two teams for a knockout slot. Pass null for an undecided side.
+   * Validates that any provided nation id exists in the tournament.
+   */
+  async setKnockoutSlot(
+    slotId: string,
+    nationAId: Id | null,
+    nationBId: Id | null,
+  ): Promise<Result<unknown, DomainError | LeagueNotFound>> {
+    const t = await this.repo.loadTournament();
+    const slots = t.knockoutSlots ?? [];
+    const slot = slots.find((s) => s.id === slotId);
+    if (!slot) return { ok: false, error: { code: "LEAGUE_NOT_FOUND" } };
+    const known = new Set(t.nations.map((n) => n.id));
+    for (const id of [nationAId, nationBId]) {
+      if (id !== null && !known.has(id)) {
+        return { ok: false, error: { code: "UNKNOWN_NATION", nation: id } };
+      }
+    }
+    const updated = slots.map((s) =>
+      s.id === slotId ? { ...s, nationAId, nationBId } : s,
+    );
+    await this.repo.saveTournament({ ...t, knockoutSlots: updated });
+    return { ok: true, value: undefined };
+  }
+
   async recordChampion(nationId: Id): Promise<Result<unknown, DomainError | LeagueNotFound>> {
     // A champion must be assigned in at least one league to be valid here; we
     // validate existence against the shared nations, and assignment against the
