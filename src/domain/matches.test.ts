@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import { listMatches, recordMatch, updateMatch, type MatchInput } from "./matches.js";
+import { listMatches, recordMatch, updateMatch, deleteMatch, type MatchInput } from "./matches.js";
 import type { Match, Nation, SweepstakeState } from "./types.js";
 
 const NUM_RUNS = 100;
@@ -295,6 +295,59 @@ describe("Property 25: updating a non-stored match is rejected with MATCH_NOT_FO
           expect(listMatches(state)).toEqual([]);
         },
       ),
+      { numRuns: NUM_RUNS },
+    );
+  });
+});
+
+// Deleting a stored match removes it; deleting a non-stored pair is rejected
+// and leaves stored matches unchanged.
+describe("deleteMatch", () => {
+  it("removes a stored match by its unordered pair and recomputes from the rest", () => {
+    fc.assert(
+      fc.property(
+        nationsArb(2),
+        validGoalsArb,
+        validGoalsArb,
+        fc.boolean(),
+        (nations, goalsA, goalsB, deleteSwapped) => {
+          const a = nations[0];
+          const b = nations[1];
+          const recorded = recordMatch(makeState(nations), {
+            nationAId: a.id,
+            nationBId: b.id,
+            goalsA,
+            goalsB,
+          });
+          expect(recorded.ok).toBe(true);
+          if (!recorded.ok) return;
+          const before = listMatches(recorded.value).length;
+
+          const result = deleteSwapped
+            ? deleteMatch(recorded.value, b.id, a.id)
+            : deleteMatch(recorded.value, a.id, b.id);
+          expect(result.ok).toBe(true);
+          if (!result.ok) return;
+          expect(listMatches(result.value).length).toBe(before - 1);
+          expect(
+            listMatches(result.value).some((m) => isPair(m, a.id, b.id)),
+          ).toBe(false);
+        },
+      ),
+      { numRuns: NUM_RUNS },
+    );
+  });
+
+  it("rejects deleting a non-stored pair with MATCH_NOT_FOUND and leaves matches unchanged", () => {
+    fc.assert(
+      fc.property(nationsArb(2), (nations) => {
+        const state = makeState(nations);
+        const result = deleteMatch(state, nations[0].id, nations[1].id);
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.error.code).toBe("MATCH_NOT_FOUND");
+        expect(listMatches(state)).toEqual([]);
+      }),
       { numRuns: NUM_RUNS },
     );
   });

@@ -12,6 +12,7 @@ import { type Rng, assign, listAssignments } from "../domain/assignment.js";
 import { buildLeagueTable } from "../domain/league.js";
 import {
   type MatchInput,
+  deleteMatch,
   listMatches,
   recordMatch,
   updateMatch,
@@ -168,6 +169,13 @@ export class LeagueService {
   async updateMatch(input: MatchInput): Promise<Result<unknown, DomainError>> {
     const t = await this.repo.loadTournament();
     const result = updateMatch(this.compose(t, emptyLeagueShell()), input);
+    if (result.ok) await this.repo.saveTournament({ ...t, matches: result.value.matches });
+    return result;
+  }
+
+  async deleteMatch(nationAId: Id, nationBId: Id): Promise<Result<unknown, DomainError>> {
+    const t = await this.repo.loadTournament();
+    const result = deleteMatch(this.compose(t, emptyLeagueShell()), nationAId, nationBId);
     if (result.ok) await this.repo.saveTournament({ ...t, matches: result.value.matches });
     return result;
   }

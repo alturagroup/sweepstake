@@ -156,6 +156,7 @@ async function route(service: LeagueService, req: IncomingMessage, res: ServerRe
     if (sub === "matches") {
       if (method === "POST") { const b = await readBody(req); return finish(res, await service.recordMatch(toMatch(b))); }
       if (method === "PUT") { const b = await readBody(req); return finish(res, await service.updateMatch(toMatch(b))); }
+      if (method === "DELETE") { const b = await readBody(req); return finish(res, await service.deleteMatch(String(b.nationAId ?? ""), String(b.nationBId ?? ""))); }
       if (method === "GET") return sendJson(res, 200, await service.listMatches());
       return methodNotAllowed(res);
     }

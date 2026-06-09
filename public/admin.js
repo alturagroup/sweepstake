@@ -234,6 +234,15 @@ function renderFixtures() {
       run(() => api(existing ? "PUT" : "POST", "/api/tournament/matches", body), `Saved ${f.home}–${f.away}.`);
     };
     li.appendChild(label); li.appendChild(save);
+    if (existing) {
+      const clear = document.createElement("button");
+      clear.textContent = "Clear"; clear.className = "secondary";
+      clear.onclick = () => {
+        if (!confirm(`Delete the recorded result for ${f.home} v ${f.away}?`)) return;
+        run(() => api("DELETE", "/api/tournament/matches", { nationAId: aId, nationBId: bId }), `Cleared ${f.home} v ${f.away}.`);
+      };
+      li.appendChild(clear);
+    }
     ul.appendChild(li);
   }
   container.appendChild(ul);
@@ -372,6 +381,11 @@ document.getElementById("create-league").onclick = () => {
 };
 document.getElementById("record-match").onclick = () => run(() => api("POST", "/api/tournament/matches", matchBody()), "Match recorded.");
 document.getElementById("update-match").onclick = () => run(() => api("PUT", "/api/tournament/matches", matchBody()), "Match updated.");
+document.getElementById("delete-match").onclick = () => {
+  const b = matchBody();
+  if (!confirm("Delete the recorded result for these two nations?")) return;
+  run(() => api("DELETE", "/api/tournament/matches", { nationAId: b.nationAId, nationBId: b.nationBId }), "Match deleted.");
+};
 document.getElementById("record-champion").onclick = () => run(() => api("POST", "/api/tournament/champion", { nationId: document.getElementById("champion").value }), "Champion recorded.");
 
 checkSession();

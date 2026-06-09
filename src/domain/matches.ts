@@ -159,6 +159,34 @@ export function updateMatch(
 }
 
 /**
+ * Delete a previously stored match result, identified by its unordered nation
+ * pair.
+ *
+ * Removes the match whose unordered pair equals the input pair. On success
+ * returns a new state with that match removed (one fewer stored match). Points
+ * and standings recompute from the remaining matches automatically.
+ *
+ * Rejections (stored matches unchanged):
+ * - `MATCH_NOT_FOUND` — no stored match exists for the given nation pair.
+ */
+export function deleteMatch(
+  state: SweepstakeState,
+  nationAId: Id,
+  nationBId: Id,
+): Result<SweepstakeState, DomainError> {
+  const exists = state.matches.some((stored) =>
+    isSamePair(stored, nationAId, nationBId),
+  );
+  if (!exists) {
+    return err({ code: "MATCH_NOT_FOUND" });
+  }
+  const matches = state.matches.filter(
+    (stored) => !isSamePair(stored, nationAId, nationBId),
+  );
+  return ok({ ...state, matches });
+}
+
+/**
  * Return the current list of recorded match results.
  *
  * Returns a shallow copy so callers cannot mutate the stored state through the
