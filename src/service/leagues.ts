@@ -298,6 +298,14 @@ export class LeagueService {
     });
   }
 
+  /** List a league's participants (admin), so the UI can show remove buttons. */
+  async listParticipants(slug: string) {
+    return this.withLeague(slug, (_t, l) => ({
+      participants: l.participants,
+      assigned: l.assignments.length > 0,
+    }));
+  }
+
   async removeParticipant(slug: string, participantId: Id) {
     return this.withLeague(slug, async (t, l) => {
       const result = removeParticipant(this.compose(t, l), participantId);

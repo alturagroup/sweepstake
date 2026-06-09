@@ -153,11 +153,14 @@ async function refreshLeagues() {
     const teamsBtn = document.createElement("button");
     teamsBtn.textContent = "Teams"; teamsBtn.className = "secondary";
     teamsBtn.onclick = () => toggleTeamPicker(lg, li);
+    const playersBtn = document.createElement("button");
+    playersBtn.textContent = "Players"; playersBtn.className = "secondary";
+    playersBtn.onclick = () => togglePlayerList(lg, li);
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete"; delBtn.className = "secondary";
     delBtn.onclick = () => { if (confirm(`Delete league "${lg.name}"? This cannot be undone.`)) run(() => api("DELETE", `/api/leagues/${encodeURIComponent(lg.slug)}`), "League deleted."); };
 
-    controls.appendChild(addBtn); controls.appendChild(drawBtn); controls.appendChild(finBtn); controls.appendChild(teamsBtn); controls.appendChild(copyBtn); controls.appendChild(delBtn);
+    controls.appendChild(addBtn); controls.appendChild(playersBtn); controls.appendChild(drawBtn); controls.appendChild(finBtn); controls.appendChild(teamsBtn); controls.appendChild(copyBtn); controls.appendChild(delBtn);
     li.appendChild(info); li.appendChild(controls);
     if (lg.nationPool !== null) {
       const poolNote = document.createElement("span");
@@ -459,6 +462,54 @@ function renderKnockout(slots, stored, nameById) {
     ul.appendChild(li);
   }
   container.appendChild(ul);
+}
+
+// --- Per-league player list ----------------------------------------------
+
+async function togglePlayerList(lg, li) {
+  const existing = li.querySelector('[data-role="player-list"]');
+  if (existing) { existing.remove(); return; }
+
+  const data = await api("GET", `/api/leagues/${encodeURIComponent(lg.slug)}/participants`);
+  const box = document.createElement("div");
+  box.dataset.role = "player-list";
+  box.style.flex = "1 1 100%";
+  box.style.marginTop = "0.5rem";
+  box.style.padding = "0.5rem 0.75rem";
+  box.style.border = "1px solid var(--line)";
+  box.style.borderRadius = "8px";
+
+  if (!data.participants || data.participants.length === 0) {
+    box.innerHTML = '<p class="muted">No players yet.</p>';
+    li.appendChild(box);
+    return;
+  }
+
+  if (data.assigned) {
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.innerHTML = "The draw has run. Players can't be removed without invalidating it — use <strong>Re-draw</strong> after removing, or delete a player before drawing.";
+    box.appendChild(note);
+  }
+
+  const ul = document.createElement("ul");
+  ul.className = "pill-list";
+  for (const p of data.participants) {
+    const row = document.createElement("li");
+    row.innerHTML = `<span>${escapeHtml(p.displayName)}</span>`;
+    const rm = document.createElement("button");
+    rm.textContent = "Remove"; rm.className = "secondary";
+    rm.disabled = data.assigned;
+    rm.title = data.assigned ? "Remove blocked while a draw exists" : "";
+    rm.onclick = () => {
+      if (!confirm(`Remove ${p.displayName} from ${lg.name}?`)) return;
+      run(() => api("DELETE", `/api/leagues/${encodeURIComponent(lg.slug)}/participants/${encodeURIComponent(p.id)}`), "Player removed.");
+    };
+    row.appendChild(rm);
+    ul.appendChild(row);
+  }
+  box.appendChild(ul);
+  li.appendChild(box);
 }
 
 async function refreshAll() {

@@ -234,6 +234,11 @@ async function route(service: LeagueService, req: IncomingMessage, res: ServerRe
         if (method === "DELETE") return finishMaybe(res, await service.removeParticipant(slug, decodeURIComponent(seg[3])));
         return methodNotAllowed(res);
       }
+      if (method === "GET") {
+        const r = await service.listParticipants(slug);
+        if (isNotFound(r)) return notFoundLeague(res);
+        return sendJson(res, 200, r);
+      }
       if (method === "POST") { const b = await readBody(req); return finishMaybe(res, await service.addParticipant(slug, String(b.name ?? ""))); }
       return methodNotAllowed(res);
     }
