@@ -72,23 +72,32 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Enforce bearer-token authentication.
+ * Enforce bearer-token authentication for state-changing requests.
  *
- * The expected token is read from the `API_TOKEN` environment variable. When
- * `API_TOKEN` is unset the API is treated as misconfigured and every request is
- * refused (fail closed) rather than silently running unprotected.
+ * Read-only requests (GET/HEAD/OPTIONS) are public so players can view the
+ * league table and prizes without a credential. Every write (POST/PUT/DELETE,
+ * etc.) requires `Authorization: Bearer <API_TOKEN>`.
  *
- * Returns true when the request is authorized; otherwise writes the appropriate
+ * The expected token is read from `API_TOKEN`. When it is unset, writes fail
+ * closed (503) rather than running unprotected; reads remain available.
+ *
+ * Returns true when the request may proceed; otherwise writes the appropriate
  * 401/503 response and returns false.
  */
 function isAuthorized(req: IncomingMessage, res: ServerResponse): boolean {
+  const method = (req.method ?? "GET").toUpperCase();
+  const isRead = method === "GET" || method === "HEAD" || method === "OPTIONS";
+  if (isRead) {
+    return true;
+  }
+
   const expected = process.env.API_TOKEN;
   if (!expected || expected.trim().length === 0) {
     res.writeHead(503, { "content-type": "application/json" });
     res.end(
       JSON.stringify({
         code: "AUTH_NOT_CONFIGURED",
-        message: "The API is not configured for access. Set API_TOKEN.",
+        message: "The API is not configured for writes. Set API_TOKEN.",
       }),
     );
     return false;
@@ -106,7 +115,7 @@ function isAuthorized(req: IncomingMessage, res: ServerResponse): boolean {
     res.end(
       JSON.stringify({
         code: "UNAUTHORIZED",
-        message: "A valid bearer token is required.",
+        message: "A valid bearer token is required for this operation.",
       }),
     );
     return false;
@@ -118,8 +127,8 @@ function isAuthorized(req: IncomingMessage, res: ServerResponse): boolean {
  * Vercel Node serverless handler. `req`/`res` are Node
  * `IncomingMessage`/`ServerResponse`, which the shared listener already speaks.
  *
- * Every request must carry a valid `Authorization: Bearer <API_TOKEN>` header;
- * unauthorized requests are rejected before the service is touched.
+ * Reads are public; writes require `Authorization: Bearer <API_TOKEN>`.
+ * Unauthorized writes are rejected before the service is touched.
  */
 export default async function handler(
   req: IncomingMessage,

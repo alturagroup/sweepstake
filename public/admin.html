@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sweepstake Admin</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Sweepstake Admin</h1>
+      <nav><a href="/">Standings</a> · <a href="/admin.html">Admin</a></nav>
+    </header>
+
+    <div class="token-bar">
+      <label for="token">API token</label>
+      <div class="row">
+        <input id="token" type="password" placeholder="Paste the API token" autocomplete="off" />
+        <button id="save-token" type="button">Save</button>
+        <button id="clear-token" type="button" class="secondary">Clear</button>
+      </div>
+      <p class="muted" id="token-state">No token saved. Writes will be rejected until you save one.</p>
+    </div>
+
+    <main>
+      <fieldset>
+        <legend>Participants</legend>
+        <div class="row">
+          <input id="participant-name" placeholder="Participant name" />
+          <button id="add-participant" type="button">Add</button>
+        </div>
+        <ul id="participant-list" class="pill-list"></ul>
+      </fieldset>
+
+      <fieldset>
+        <legend>Nations</legend>
+        <div class="row">
+          <input id="nation-name" placeholder="Nation name" />
+          <button id="add-nation" type="button">Add</button>
+        </div>
+        <ul id="nation-list" class="pill-list"></ul>
+      </fieldset>
+
+      <fieldset>
+        <legend>Assignment</legend>
+        <p class="muted">Randomly assigns every nation to a participant.</p>
+        <div class="row">
+          <button id="assign" type="button">Run assignment</button>
+          <button id="assign-replace" type="button" class="secondary">Replace existing</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Record / update match</legend>
+        <div class="row">
+          <div>
+            <label for="match-a">Nation A</label>
+            <select id="match-a"></select>
+          </div>
+          <div>
+            <label for="goals-a">Goals A</label>
+            <input id="goals-a" type="number" min="0" max="99" value="0" />
+          </div>
+          <div>
+            <label for="match-b">Nation B</label>
+            <select id="match-b"></select>
+          </div>
+          <div>
+            <label for="goals-b">Goals B</label>
+            <input id="goals-b" type="number" min="0" max="99" value="0" />
+          </div>
+        </div>
+        <div class="row">
+          <button id="record-match" type="button">Record</button>
+          <button id="update-match" type="button" class="secondary">Update existing</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Prizes</legend>
+        <div class="row">
+          <div>
+            <label for="champion">Champion nation</label>
+            <select id="champion"></select>
+          </div>
+          <button id="record-champion" type="button">Record champion</button>
+        </div>
+        <div class="row" style="margin-top:0.75rem">
+          <button id="finalize" type="button">Finalize league</button>
+        </div>
+      </fieldset>
+    </main>
+
+    <div id="toast" class="toast"></div>
+    <script src="/admin.js"></script>
+  </body>
+</html>
