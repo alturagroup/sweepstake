@@ -8,10 +8,19 @@
 
 const slug = location.pathname.replace(/^\/l\//, "").replace(/\/+$/, "");
 const POLL_MS = 5000;
+/** localStorage key for the last draw signature this browser has already seen revealed. */
+const SEEN_KEY = `sweepstake_seen_draw_${slug}`;
 
 let pollTimer = null;
 let lastAssignmentSig = null; // signature of the last-seen assignment set
 let revealing = false;        // suppress re-render churn during an animation
+
+function seenDraw(sig) {
+  try { return localStorage.getItem(SEEN_KEY) === sig; } catch { return false; }
+}
+function markSeen(sig) {
+  try { localStorage.setItem(SEEN_KEY, sig); } catch { /* ignore */ }
+}
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
@@ -165,29 +174,21 @@ async function tick(initial) {
 
   const sig = assignmentSignature(view);
   const hasDraw = view.assignments.some((r) => r.nations.length > 0);
+  lastAssignmentSig = sig;
 
-  // First load: just show current state, remember the signature, no animation
-  // (so refreshing mid-tournament doesn't replay the draw every time).
-  if (initial) {
-    lastAssignmentSig = sig;
-    if (!hasDraw) document.getElementById("draw-reveal").hidden = true;
-    renderStandings(view);
-    return;
-  }
-
-  // A new/changed draw appeared while watching -> animate the reveal.
-  if (sig !== lastAssignmentSig && hasDraw && !revealing) {
-    lastAssignmentSig = sig;
+  // Reveal once per browser per draw: if there's a draw this browser hasn't
+  // seen yet, play the animation — even on first load (so people arriving just
+  // after the draw is triggered still get the reveal). Refreshes and return
+  // visits skip it because the signature is remembered in localStorage.
+  if (hasDraw && !seenDraw(sig) && !revealing) {
+    markSeen(sig);
     await playReveal(view);
     renderStandings(view);
     return;
   }
 
-  // No draw change: just refresh standings (unless mid-animation).
-  if (!revealing) {
-    lastAssignmentSig = sig;
-    renderStandings(view);
-  }
+  if (!hasDraw) document.getElementById("draw-reveal").hidden = true;
+  if (!revealing) renderStandings(view);
 }
 
 function startPolling() {
