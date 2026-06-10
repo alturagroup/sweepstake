@@ -56,6 +56,8 @@ export interface League {
    * ranked teams for a 10-player league).
    */
   includedNationIds: Id[] | null;
+  /** ISO timestamp of when the current draw was run, or null if not yet drawn. */
+  drawnAt: string | null;
 }
 
 /** Build the empty knockout bracket: 16 R32, 8 R16, 4 QF, 2 SF, Bronze, Final. */
@@ -129,12 +131,16 @@ export class NeonLeagueRepository {
         participants JSONB NOT NULL DEFAULT '[]'::jsonb,
         assignments JSONB NOT NULL DEFAULT '[]'::jsonb,
         league_finalized BOOLEAN NOT NULL DEFAULT FALSE,
-        included_nation_ids JSONB
+        included_nation_ids JSONB,
+        drawn_at TEXT
       )
     `;
-    // Add the column to pre-existing tables (no-op if already present).
+    // Add columns to pre-existing tables (no-op if already present).
     await this.sql`
       ALTER TABLE leagues ADD COLUMN IF NOT EXISTS included_nation_ids JSONB
+    `;
+    await this.sql`
+      ALTER TABLE leagues ADD COLUMN IF NOT EXISTS drawn_at TEXT
     `;
   }
 
@@ -171,6 +177,7 @@ export class NeonLeagueRepository {
     assignments: Assignment[];
     league_finalized: boolean;
     included_nation_ids: Id[] | null;
+    drawn_at: string | null;
   }): League {
     return {
       id: row.id,
@@ -181,12 +188,13 @@ export class NeonLeagueRepository {
       assignments: row.assignments,
       leagueFinalized: row.league_finalized,
       includedNationIds: row.included_nation_ids ?? null,
+      drawnAt: row.drawn_at ?? null,
     };
   }
 
   async listLeagues(): Promise<League[]> {
     const rows = (await this.sql`
-      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids
+      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids, drawn_at
       FROM leagues ORDER BY name
     `) as Parameters<typeof NeonLeagueRepository.rowToLeague>[0][];
     return rows.map((r) => NeonLeagueRepository.rowToLeague(r));
@@ -194,7 +202,7 @@ export class NeonLeagueRepository {
 
   async getLeagueBySlug(slug: string): Promise<League | null> {
     const rows = (await this.sql`
-      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids
+      SELECT id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids, drawn_at
       FROM leagues WHERE slug = ${slug}
     `) as Parameters<typeof NeonLeagueRepository.rowToLeague>[0][];
     const row = rows[0];
@@ -203,17 +211,18 @@ export class NeonLeagueRepository {
 
   async insertLeague(league: League): Promise<void> {
     await this.sql`
-      INSERT INTO leagues (id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids)
+      INSERT INTO leagues (id, slug, name, view_password_hash, participants, assignments, league_finalized, included_nation_ids, drawn_at)
       VALUES (
         ${league.id}, ${league.slug}, ${league.name}, ${league.viewPasswordHash},
         ${JSON.stringify(league.participants)}, ${JSON.stringify(league.assignments)},
         ${league.leagueFinalized},
-        ${league.includedNationIds === null ? null : JSON.stringify(league.includedNationIds)}
+        ${league.includedNationIds === null ? null : JSON.stringify(league.includedNationIds)},
+        ${league.drawnAt}
       )
     `;
   }
 
-  /** Persist the mutable per-league fields (participants/assignments/finalized/included nations). */
+  /** Persist the mutable per-league fields. */
   async saveLeague(league: League): Promise<void> {
     await this.sql`
       UPDATE leagues SET
@@ -222,7 +231,8 @@ export class NeonLeagueRepository {
         participants = ${JSON.stringify(league.participants)},
         assignments = ${JSON.stringify(league.assignments)},
         league_finalized = ${league.leagueFinalized},
-        included_nation_ids = ${league.includedNationIds === null ? null : JSON.stringify(league.includedNationIds)}
+        included_nation_ids = ${league.includedNationIds === null ? null : JSON.stringify(league.includedNationIds)},
+        drawn_at = ${league.drawnAt}
       WHERE id = ${league.id}
     `;
   }

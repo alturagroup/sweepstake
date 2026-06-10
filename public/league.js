@@ -8,6 +8,8 @@
 
 const slug = location.pathname.replace(/^\/l\//, "").replace(/\/+$/, "");
 const POLL_MS = 5000;
+/** Only reveal the draw to first-time viewers within this many hours of the draw. */
+const REVEAL_WINDOW_HOURS = 24;
 /** localStorage key for the last draw signature this browser has already seen revealed. */
 const SEEN_KEY = `sweepstake_seen_draw_${slug}`;
 
@@ -176,11 +178,17 @@ async function tick(initial) {
   const hasDraw = view.assignments.some((r) => r.nations.length > 0);
   lastAssignmentSig = sig;
 
-  // Reveal once per browser per draw: if there's a draw this browser hasn't
-  // seen yet, play the animation — even on first load (so people arriving just
-  // after the draw is triggered still get the reveal). Refreshes and return
-  // visits skip it because the signature is remembered in localStorage.
-  if (hasDraw && !seenDraw(sig) && !revealing) {
+  // Reveal once per browser per draw, but only within the reveal window after
+  // the draw was run. Outside the window, first-time viewers go straight to
+  // standings. (drawnAt is an ISO timestamp set when the draw runs.)
+  const withinWindow = (() => {
+    if (!view.drawnAt) return false;
+    const drawnMs = new Date(view.drawnAt).getTime();
+    if (Number.isNaN(drawnMs)) return false;
+    return Date.now() - drawnMs <= REVEAL_WINDOW_HOURS * 3600 * 1000;
+  })();
+
+  if (hasDraw && withinWindow && !seenDraw(sig) && !revealing) {
     markSeen(sig);
     await playReveal(view);
     renderStandings(view);

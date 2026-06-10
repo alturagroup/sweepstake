@@ -258,6 +258,7 @@ export class LeagueService {
       assignments: [],
       leagueFinalized: false,
       includedNationIds: null,
+      drawnAt: null,
     };
     await this.repo.insertLeague(league);
     return { ok: true, value: league };
@@ -317,7 +318,7 @@ export class LeagueService {
   async assign(slug: string, confirmReplace = false) {
     return this.withLeague(slug, async (t, l) => {
       const result = assign(this.compose(t, l), this.rng, confirmReplace);
-      if (result.ok) await this.repo.saveLeague({ ...l, assignments: result.value.assignments });
+      if (result.ok) await this.repo.saveLeague({ ...l, assignments: result.value.assignments, drawnAt: new Date().toISOString() });
       return result;
     });
   }
@@ -338,6 +339,7 @@ export class LeagueService {
       return {
         name: l.name,
         slug: l.slug,
+        drawnAt: l.drawnAt,
         leagueTable: buildLeagueTable(state),
         assignments: listAssignments(state),
         matches: listMatches(state),
@@ -383,6 +385,7 @@ function emptyLeagueShell(): League {
     assignments: [],
     leagueFinalized: false,
     includedNationIds: null,
+    drawnAt: null,
   };
 }
 
