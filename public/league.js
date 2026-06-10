@@ -142,7 +142,7 @@ function playReveal(view) {
     el.innerHTML = `<h3>🎲 The draw is in!</h3><div class="reveal-grid"></div>`;
     const grid = el.querySelector(".reveal-grid");
 
-    const STEP = 600; // ms between cards
+    const STEP = 5000; // ms between each player's team reveal
     players.forEach((row, i) => {
       const card = document.createElement("div");
       card.className = "reveal-card";
