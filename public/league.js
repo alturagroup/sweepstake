@@ -1,8 +1,17 @@
-// Per-league public view at /l/{slug}. Shows a password gate, then the
-// standings scoped to that league. The view endpoint relies on an HttpOnly
-// cookie set by /login, so no token is stored client-side.
+// Per-league public view at /l/{slug}. Password gate, then standings.
+//
+// Live draw: the page polls the view every few seconds. When the set of
+// assignments first appears (or changes), it animates a "draw reveal" of each
+// player's teams, then shows the standings. This gives a live, auto-updating
+// experience without any realtime infrastructure — it animates already-saved
+// data fetched on a timer.
 
 const slug = location.pathname.replace(/^\/l\//, "").replace(/\/+$/, "");
+const POLL_MS = 5000;
+
+let pollTimer = null;
+let lastAssignmentSig = null; // signature of the last-seen assignment set
+let revealing = false;        // suppress re-render churn during an animation
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
@@ -11,11 +20,26 @@ function escapeHtml(s) {
 }
 
 async function fetchView() {
-  const res = await fetch(`/api/leagues/${encodeURIComponent(slug)}/view`, {
+  return fetch(`/api/leagues/${encodeURIComponent(slug)}/view`, {
     headers: { accept: "application/json" },
     credentials: "same-origin",
   });
-  return res;
+}
+
+/** Stable signature of who-has-which-teams, to detect draw changes. */
+function assignmentSignature(view) {
+  return view.assignments
+    .map((row) => `${row.participant.id}:${row.nations.map((n) => n.id).sort().join(",")}`)
+    .sort()
+    .join("|");
+}
+
+function teamsByPlayer(view) {
+  const teams = new Map();
+  for (const row of view.assignments) {
+    teams.set(row.participant.id, row.nations.map((n) => n.displayName));
+  }
+  return teams;
 }
 
 function formStrip(form) {
@@ -24,10 +48,9 @@ function formStrip(form) {
   return '<span class="form">' + last5.map((r) => `<span class="dot ${r}">${r.toUpperCase()}</span>`).join("") + "</span>";
 }
 
-/** Derive W/D/L/Goals/Form per participant from the league view payload. */
 function computeStats(view) {
-  const owner = new Map(); // nationId -> participantId
-  const teams = new Map(); // participantId -> [names]
+  const owner = new Map();
+  const teams = new Map();
   for (const row of view.assignments) {
     for (const n of row.nations) {
       owner.set(n.id, row.participant.id);
@@ -51,12 +74,11 @@ function computeStats(view) {
   return { stats, teams };
 }
 
-function render(view) {
+function renderStandings(view) {
   document.getElementById("league-name").textContent = (view.name || "League").toUpperCase();
   const { stats, teams } = computeStats(view);
   const rows = view.leagueTable;
 
-  // Podium
   const podium = document.getElementById("podium");
   if (rows.length >= 3) {
     const order = [{ r: rows[1], c: "second", n: 2 }, { r: rows[0], c: "first", n: 1 }, { r: rows[2], c: "third", n: 3 }];
@@ -66,13 +88,15 @@ function render(view) {
       return `<div class="slot ${c}"><div class="rank-num">${n}</div><div class="name">${escapeHtml(r.displayName)}</div><div class="team">${escapeHtml(label)}</div><div class="pts">${r.totalPoints} PTS</div></div>`;
     }).join("");
     podium.hidden = false;
+  } else {
+    podium.hidden = true;
   }
 
   const status = document.getElementById("league-status");
   const table = document.getElementById("league-table");
   const tbody = table.querySelector("tbody");
   tbody.innerHTML = "";
-  if (rows.length === 0) { status.textContent = "No participants yet."; table.hidden = true; }
+  if (rows.length === 0) { status.textContent = "No participants yet."; status.hidden = false; table.hidden = true; }
   else {
     for (const row of rows) {
       const s = stats.get(row.participantId) || { w: 0, d: 0, l: 0, goals: 0, form: [] };
@@ -93,23 +117,99 @@ function render(view) {
   }
 }
 
+/**
+ * Animate the draw reveal: each player's card drops in one after another with
+ * a staggered delay, their teams highlighted. Resolves when fully revealed.
+ */
+function playReveal(view) {
+  return new Promise((resolve) => {
+    const el = document.getElementById("draw-reveal");
+    const teams = teamsByPlayer(view);
+    const players = view.assignments.filter((row) => row.nations.length > 0);
+    if (players.length === 0) { el.hidden = true; resolve(); return; }
+
+    revealing = true;
+    el.hidden = false;
+    el.innerHTML = `<h3>🎲 The draw is in!</h3><div class="reveal-grid"></div>`;
+    const grid = el.querySelector(".reveal-grid");
+
+    const STEP = 600; // ms between cards
+    players.forEach((row, i) => {
+      const card = document.createElement("div");
+      card.className = "reveal-card";
+      card.style.animationDelay = `${i * STEP}ms`;
+      const names = (teams.get(row.participant.id) || []);
+      card.innerHTML =
+        `<div class="player">${escapeHtml(row.participant.displayName)}</div>` +
+        `<div class="teams">${names.map((n) => `<span class="new">${escapeHtml(n)}</span>`).join("")}</div>`;
+      grid.appendChild(card);
+    });
+
+    const total = players.length * STEP + 600;
+    setTimeout(() => { revealing = false; resolve(); }, total);
+  });
+}
+
+async function tick(initial) {
+  let res;
+  try { res = await fetchView(); } catch { return; }
+
+  if (res.status === 401) { stopPolling(); showGate(""); return; }
+  if (res.status === 404) { stopPolling(); showGate("No league found for this link."); return; }
+  if (res.status !== 200) return;
+
+  const view = await res.json();
+  document.getElementById("gate").hidden = true;
+  document.getElementById("standings").hidden = false;
+  document.getElementById("live-dot").hidden = false;
+
+  const sig = assignmentSignature(view);
+  const hasDraw = view.assignments.some((r) => r.nations.length > 0);
+
+  // First load: just show current state, remember the signature, no animation
+  // (so refreshing mid-tournament doesn't replay the draw every time).
+  if (initial) {
+    lastAssignmentSig = sig;
+    if (!hasDraw) document.getElementById("draw-reveal").hidden = true;
+    renderStandings(view);
+    return;
+  }
+
+  // A new/changed draw appeared while watching -> animate the reveal.
+  if (sig !== lastAssignmentSig && hasDraw && !revealing) {
+    lastAssignmentSig = sig;
+    await playReveal(view);
+    renderStandings(view);
+    return;
+  }
+
+  // No draw change: just refresh standings (unless mid-animation).
+  if (!revealing) {
+    lastAssignmentSig = sig;
+    renderStandings(view);
+  }
+}
+
+function startPolling() {
+  if (pollTimer !== null) return;
+  pollTimer = setInterval(() => tick(false), POLL_MS);
+}
+function stopPolling() {
+  if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null; }
+  document.getElementById("live-dot").hidden = true;
+}
+
 function showGate(message) {
   document.getElementById("standings").hidden = true;
+  document.getElementById("draw-reveal").hidden = true;
   document.getElementById("gate").hidden = false;
   if (message) document.getElementById("gate-error").textContent = message;
 }
 
-async function load() {
+async function start() {
   if (!slug) { showGate("Invalid league link."); return; }
-  const res = await fetchView();
-  if (res.status === 200) {
-    document.getElementById("gate").hidden = true;
-    document.getElementById("standings").hidden = false;
-    render(await res.json());
-    return;
-  }
-  if (res.status === 404) { showGate("No league found for this link."); return; }
-  showGate(""); // 401: needs password
+  await tick(true);
+  if (!document.getElementById("standings").hidden) startPolling();
 }
 
 document.getElementById("enter").onclick = async () => {
@@ -120,9 +220,21 @@ document.getElementById("enter").onclick = async () => {
     credentials: "same-origin",
     body: JSON.stringify({ password }),
   });
-  if (res.ok) { document.getElementById("gate-error").textContent = ""; load(); }
-  else if (res.status === 404) document.getElementById("gate-error").textContent = "No league found for this link.";
-  else document.getElementById("gate-error").textContent = "Incorrect password.";
+  if (res.ok) {
+    document.getElementById("gate-error").textContent = "";
+    await tick(true);
+    startPolling();
+  } else if (res.status === 404) {
+    document.getElementById("gate-error").textContent = "No league found for this link.";
+  } else {
+    document.getElementById("gate-error").textContent = "Incorrect password.";
+  }
 };
 
-load();
+// Pause polling when the tab is hidden; resume (and refresh) when visible.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopPolling();
+  else if (!document.getElementById("standings").hidden) { tick(false); startPolling(); }
+});
+
+start();

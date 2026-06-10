@@ -33,7 +33,11 @@
 
       <!-- Standings -->
       <section id="standings" class="card leaderboard" hidden>
-        <div class="card-head"><h2>LEAGUE LEADERBOARD</h2></div>
+        <div class="card-head">
+          <h2>LEAGUE LEADERBOARD</h2>
+          <span id="live-dot" class="live-dot" title="Auto-updating" hidden>● LIVE</span>
+        </div>
+        <div id="draw-reveal" class="draw-reveal" hidden></div>
         <div id="podium" class="podium" hidden></div>
         <div id="league-status" class="muted">Loading…</div>
         <table id="league-table" class="leaderboard-table" hidden>
