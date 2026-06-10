@@ -8,8 +8,8 @@
 
 const slug = location.pathname.replace(/^\/l\//, "").replace(/\/+$/, "");
 const POLL_MS = 5000;
-/** Only reveal the draw to first-time viewers within this many hours of the draw. */
-const REVEAL_WINDOW_HOURS = 24;
+/** Only reveal the draw to first-time viewers within this many minutes of the draw. */
+const REVEAL_WINDOW_MINUTES = 2;
 /** localStorage key for the last draw signature this browser has already seen revealed. */
 const SEEN_KEY = `sweepstake_seen_draw_${slug}`;
 
@@ -185,7 +185,7 @@ async function tick(initial) {
     if (!view.drawnAt) return false;
     const drawnMs = new Date(view.drawnAt).getTime();
     if (Number.isNaN(drawnMs)) return false;
-    return Date.now() - drawnMs <= REVEAL_WINDOW_HOURS * 3600 * 1000;
+    return Date.now() - drawnMs <= REVEAL_WINDOW_MINUTES * 60 * 1000;
   })();
 
   if (hasDraw && withinWindow && !seenDraw(sig) && !revealing) {
