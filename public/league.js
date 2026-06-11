@@ -172,6 +172,7 @@ async function tick(initial) {
   const view = await res.json();
   document.getElementById("gate").hidden = true;
   document.getElementById("standings").hidden = false;
+  document.getElementById("rules").hidden = false;
   document.getElementById("live-dot").hidden = false;
 
   const sig = assignmentSignature(view);
@@ -211,6 +212,8 @@ function stopPolling() {
 function showGate(message) {
   document.getElementById("standings").hidden = true;
   document.getElementById("draw-reveal").hidden = true;
+  const rules = document.getElementById("rules");
+  if (rules) rules.hidden = true;
   document.getElementById("gate").hidden = false;
   if (message) document.getElementById("gate-error").textContent = message;
 }
